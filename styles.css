@@ -505,3 +505,82 @@ textarea {
 .empty-state p {
   margin: 0.5rem 0;
 }
+
+/*  Pipeline Tabs  */
+.pipeline-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+}
+
+.pipeline-tab {
+  padding: 0.35rem 0.9rem;
+  border-radius: 99px;
+  border: 1.5px solid var(--stroke);
+  background: white;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.pipeline-tab:hover {
+  border-color: var(--accent-2);
+  color: var(--accent);
+}
+
+.pipeline-tab--active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+  font-weight: 700;
+}
+
+/*  Pipeline stage badges  */
+.badge--new       { background: #e3e8f0; color: #3a4a6b; }
+.badge--contacted { background: #dbeafe; color: #1d4ed8; }
+.badge--follow-up { background: #fef3c7; color: #92400e; }
+.badge--proposal  { background: #ede9fe; color: #6d28d9; }
+.badge--won       { background: #d1fae5; color: #065f46; }
+.badge--lost      { background: #fee2e2; color: #991b1b; }
+
+/*  Convert button  */
+.convert-btn {
+  background: #059669;
+  color: white;
+  border: none;
+  padding: 0.5rem 1.1rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-family: inherit;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.convert-btn:hover {
+  background: #047857;
+}
+
+/*  Prospect contact info panel  */
+.prospect-contact-info {
+  display: grid;
+  gap: 0.6rem;
+  padding: 0.5rem 0;
+}
+
+.prospect-contact-info__row {
+  display: flex;
+  gap: 0.75rem;
+  align-items: baseline;
+  font-size: 0.9rem;
+}
+
+.prospect-contact-info__label {
+  color: var(--muted);
+  font-size: 0.78rem;
+  min-width: 50px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}

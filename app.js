@@ -433,3 +433,306 @@ document.querySelectorAll(".modal").forEach(modal => {
     if (e.target === modal) closeModal(modal.id);
   });
 });
+
+//  Sidebar Nav 
+document.querySelectorAll(".sidebar__link[data-view]").forEach(link => {
+  link.addEventListener("click", e => {
+    e.preventDefault();
+    const view = link.dataset.view;
+    document.querySelectorAll(".sidebar__link[data-view]").forEach(l => l.classList.remove("sidebar__link--active"));
+    link.classList.add("sidebar__link--active");
+    viewCustomers.style.display = "none";
+    viewDetail.style.display = "none";
+    document.getElementById("view-prospects").style.display = "none";
+    document.getElementById("view-prospect-detail").style.display = "none";
+    if (view === "customers") {
+      viewCustomers.style.display = "block";
+      renderCustomerList(searchInput.value);
+    } else if (view === "prospects") {
+      document.getElementById("view-prospects").style.display = "block";
+      renderProspectList();
+    }
+  });
+});
+
+//  Prospects Storage 
+const PROSPECTS_KEY = "hhcrm_prospects";
+
+function loadProspects() {
+  const raw = localStorage.getItem(PROSPECTS_KEY);
+  if (!raw) return [];
+  try { return JSON.parse(raw); } catch { return []; }
+}
+
+function saveProspects() {
+  localStorage.setItem(PROSPECTS_KEY, JSON.stringify(state.prospects));
+}
+
+state.prospects = loadProspects();
+state.currentProspectId = null;
+state.editingProspectId = null;
+state.activePipelineStage = "all";
+
+function getProspect(id) {
+  return state.prospects.find(p => p.id === id);
+}
+
+function getProspectAddress(p) {
+  const parts = [p.street, p.city, p.state ? p.state.toUpperCase() : null, p.zip].filter(Boolean);
+  return parts.length ? parts.join(", ") : "";
+}
+
+//  Pipeline Tabs 
+document.getElementById("pipeline-tabs").addEventListener("click", e => {
+  const tab = e.target.closest(".pipeline-tab");
+  if (!tab) return;
+  document.querySelectorAll(".pipeline-tab").forEach(t => t.classList.remove("pipeline-tab--active"));
+  tab.classList.add("pipeline-tab--active");
+  state.activePipelineStage = tab.dataset.stage;
+  renderProspectList();
+});
+
+document.getElementById("prospect-search-input").addEventListener("input", () => renderProspectList());
+
+//  Render Prospect List 
+const STAGE_LABELS = {
+  new: "New Lead", contacted: "Contacted", "follow-up": "Follow-up",
+  proposal: "Proposal Sent", won: "Won", lost: "Lost",
+};
+
+function renderProspectList() {
+  const stage = state.activePipelineStage;
+  const q = document.getElementById("prospect-search-input").value.toLowerCase();
+  const filtered = state.prospects.filter(p => {
+    const nameMatch = `${p.firstName} ${p.lastName}`.toLowerCase().includes(q) ||
+      getProspectAddress(p).toLowerCase().includes(q) ||
+      (p.phone || "").toLowerCase().includes(q);
+    const stageMatch = stage === "all" || p.stage === stage;
+    return nameMatch && stageMatch;
+  });
+
+  const total = state.prospects.length;
+  document.getElementById("prospect-count").textContent = `${total} prospect${total !== 1 ? "s" : ""}`;
+
+  const listEl = document.getElementById("prospect-list");
+  if (filtered.length === 0) {
+    listEl.innerHTML = `<div class="empty-state"><p>No prospects found.</p><p>Click "+ Add Prospect" to get started.</p></div>`;
+    return;
+  }
+
+  listEl.innerHTML = filtered.map(p => {
+    const addr = getProspectAddress(p);
+    const stageLabel = STAGE_LABELS[p.stage] || "New Lead";
+    return `
+      <div class="customer-card" data-id="${p.id}">
+        <div>
+          <div class="customer-card__name">${escapeHtml(p.firstName)} ${escapeHtml(p.lastName)}</div>
+          <div class="customer-card__meta">
+            ${addr ? `<span>&#128205; ${escapeHtml(addr)}</span>` : ""}
+            ${p.phone ? `<span>&#128222; ${escapeHtml(p.phone)}</span>` : ""}
+            ${p.followUpDate ? `<span>&#128197; Follow-up: ${formatDate(p.followUpDate)}</span>` : ""}
+          </div>
+        </div>
+        <div><span class="customer-card__badge badge--${p.stage || "new"}">${stageLabel}</span></div>
+      </div>`;
+  }).join("");
+
+  listEl.querySelectorAll(".customer-card").forEach(el => {
+    el.addEventListener("click", () => openProspect(el.dataset.id));
+  });
+}
+
+//  Open Prospect Detail 
+function openProspect(id) {
+  state.currentProspectId = id;
+  const p = getProspect(id);
+  if (!p) return;
+
+  document.getElementById("prospect-detail-name").textContent = `${p.firstName} ${p.lastName}`;
+  document.getElementById("prospect-detail-address").textContent = getProspectAddress(p);
+  document.getElementById("prospect-stage").value = p.stage || "new";
+  document.getElementById("prospect-source").value = p.source || "";
+  document.getElementById("prospect-last-contact").value = p.lastContactDate || "";
+  document.getElementById("prospect-followup").value = p.followUpDate || "";
+
+  const info = document.getElementById("prospect-contact-info");
+  info.innerHTML = `
+    <div class="prospect-contact-info__row">
+      <span class="prospect-contact-info__label">Phone</span>
+      <span>${p.phone ? escapeHtml(p.phone) : '<em style="color:var(--muted)">Not on file</em>'}</span>
+    </div>
+    <div class="prospect-contact-info__row">
+      <span class="prospect-contact-info__label">Email</span>
+      <span>${p.email ? escapeHtml(p.email) : '<em style="color:var(--muted)">Not on file</em>'}</span>
+    </div>
+    ${p.source ? `<div class="prospect-contact-info__row"><span class="prospect-contact-info__label">Source</span><span>${escapeHtml(STAGE_LABELS[p.source] || p.source)}</span></div>` : ""}
+  `;
+
+  renderProspectNotes(p);
+  document.getElementById("view-prospects").style.display = "none";
+  document.getElementById("view-prospect-detail").style.display = "block";
+}
+
+document.getElementById("btn-back-prospect").addEventListener("click", () => {
+  document.getElementById("view-prospect-detail").style.display = "none";
+  document.getElementById("view-prospects").style.display = "block";
+  state.currentProspectId = null;
+  renderProspectList();
+});
+
+//  Prospect Notes 
+function renderProspectNotes(p) {
+  const list = document.getElementById("prospect-note-list");
+  const notes = (p.notes || []).slice().reverse();
+  if (notes.length === 0) {
+    list.innerHTML = `<div class="empty-state"><p>No notes yet.</p></div>`;
+    return;
+  }
+  list.innerHTML = notes.map(n => `
+    <div class="note-item">
+      <div>
+        <div class="note-item__text">${escapeHtml(n.text)}</div>
+        <div class="note-item__date">${formatDate(n.createdAt)}</div>
+      </div>
+      <button class="ghost danger icon-btn" data-action="delete-prospect-note" data-id="${n.id}">&#10005;</button>
+    </div>
+  `).join("");
+  list.querySelectorAll("[data-action='delete-prospect-note']").forEach(btn => {
+    btn.addEventListener("click", () => {
+      if (!confirm("Delete this note?")) return;
+      p.notes = (p.notes || []).filter(n => n.id !== btn.dataset.id);
+      saveProspects();
+      renderProspectNotes(p);
+    });
+  });
+}
+
+document.getElementById("btn-add-prospect-note").addEventListener("click", () => openModal("modal-prospect-note"));
+
+document.getElementById("form-prospect-note").addEventListener("submit", e => {
+  e.preventDefault();
+  const p = getProspect(state.currentProspectId);
+  if (!p) return;
+  if (!p.notes) p.notes = [];
+  p.notes.push({ id: generateId(), text: document.getElementById("prospect-note-text").value.trim(), createdAt: new Date().toISOString() });
+  saveProspects();
+  renderProspectNotes(p);
+  closeModal("modal-prospect-note");
+  document.getElementById("prospect-note-text").value = "";
+});
+
+//  Save Pipeline Status 
+document.getElementById("btn-save-prospect-status").addEventListener("click", () => {
+  const p = getProspect(state.currentProspectId);
+  if (!p) return;
+  p.stage = document.getElementById("prospect-stage").value;
+  p.source = document.getElementById("prospect-source").value;
+  p.lastContactDate = document.getElementById("prospect-last-contact").value;
+  p.followUpDate = document.getElementById("prospect-followup").value;
+  saveProspects();
+  const btn = document.getElementById("btn-save-prospect-status");
+  btn.textContent = "Saved \u2713";
+  setTimeout(() => { btn.textContent = "Save Status"; }, 2000);
+});
+
+//  Add / Edit Prospect Modal 
+document.getElementById("btn-add-prospect").addEventListener("click", () => {
+  state.editingProspectId = null;
+  document.getElementById("modal-prospect-title").textContent = "Add Prospect";
+  ["prospect-first","prospect-last","prospect-street","prospect-city","prospect-state","prospect-zip","prospect-email","prospect-phone","prospect-form-last-contact","prospect-form-followup"].forEach(id => {
+    document.getElementById(id).value = "";
+  });
+  document.getElementById("prospect-form-stage").value = "new";
+  document.getElementById("prospect-form-source").value = "";
+  openModal("modal-prospect");
+});
+
+document.getElementById("btn-edit-prospect").addEventListener("click", () => {
+  const p = getProspect(state.currentProspectId);
+  if (!p) return;
+  state.editingProspectId = p.id;
+  document.getElementById("modal-prospect-title").textContent = "Edit Prospect";
+  document.getElementById("prospect-first").value = p.firstName || "";
+  document.getElementById("prospect-last").value = p.lastName || "";
+  document.getElementById("prospect-street").value = p.street || "";
+  document.getElementById("prospect-city").value = p.city || "";
+  document.getElementById("prospect-state").value = p.state || "";
+  document.getElementById("prospect-zip").value = p.zip || "";
+  document.getElementById("prospect-email").value = p.email || "";
+  document.getElementById("prospect-phone").value = p.phone || "";
+  document.getElementById("prospect-form-stage").value = p.stage || "new";
+  document.getElementById("prospect-form-source").value = p.source || "";
+  document.getElementById("prospect-form-last-contact").value = p.lastContactDate || "";
+  document.getElementById("prospect-form-followup").value = p.followUpDate || "";
+  openModal("modal-prospect");
+});
+
+document.getElementById("form-prospect").addEventListener("submit", e => {
+  e.preventDefault();
+  const data = {
+    firstName: document.getElementById("prospect-first").value.trim(),
+    lastName: document.getElementById("prospect-last").value.trim(),
+    street: document.getElementById("prospect-street").value.trim(),
+    city: document.getElementById("prospect-city").value.trim(),
+    state: document.getElementById("prospect-state").value.trim().toUpperCase(),
+    zip: document.getElementById("prospect-zip").value.trim(),
+    email: document.getElementById("prospect-email").value.trim(),
+    phone: document.getElementById("prospect-phone").value.trim(),
+    stage: document.getElementById("prospect-form-stage").value,
+    source: document.getElementById("prospect-form-source").value,
+    lastContactDate: document.getElementById("prospect-form-last-contact").value,
+    followUpDate: document.getElementById("prospect-form-followup").value,
+  };
+  if (state.editingProspectId) {
+    const idx = state.prospects.findIndex(p => p.id === state.editingProspectId);
+    if (idx !== -1) {
+      state.prospects[idx] = { ...state.prospects[idx], ...data };
+      document.getElementById("prospect-detail-name").textContent = `${data.firstName} ${data.lastName}`;
+      document.getElementById("prospect-detail-address").textContent = getProspectAddress(data);
+    }
+  } else {
+    state.prospects.push({ id: generateId(), ...data, notes: [], createdAt: new Date().toISOString() });
+  }
+  saveProspects();
+  renderProspectList();
+  closeModal("modal-prospect");
+});
+
+//  Delete Prospect 
+document.getElementById("btn-delete-prospect").addEventListener("click", () => {
+  const p = getProspect(state.currentProspectId);
+  if (!p) return;
+  if (!confirm(`Delete ${p.firstName} ${p.lastName}? This cannot be undone.`)) return;
+  state.prospects = state.prospects.filter(x => x.id !== state.currentProspectId);
+  saveProspects();
+  document.getElementById("view-prospect-detail").style.display = "none";
+  document.getElementById("view-prospects").style.display = "block";
+  state.currentProspectId = null;
+  renderProspectList();
+});
+
+//  Convert Prospect to Customer 
+document.getElementById("btn-convert-prospect").addEventListener("click", () => {
+  const p = getProspect(state.currentProspectId);
+  if (!p) return;
+  if (!confirm(`Convert ${p.firstName} ${p.lastName} to an active customer?`)) return;
+  state.customers.push({
+    id: generateId(),
+    firstName: p.firstName, lastName: p.lastName,
+    street: p.street || "", city: p.city || "", state: p.state || "", zip: p.zip || "",
+    email: p.email || "", phone: p.phone || "",
+    status: "active", notes: p.notes || [], contacts: [],
+    startDate: new Date().toISOString().slice(0, 10), secondary: null,
+  });
+  saveCustomers();
+  state.prospects = state.prospects.filter(x => x.id !== state.currentProspectId);
+  saveProspects();
+  document.querySelectorAll(".sidebar__link[data-view]").forEach(l => l.classList.remove("sidebar__link--active"));
+  document.querySelector(".sidebar__link[data-view='customers']").classList.add("sidebar__link--active");
+  document.getElementById("view-prospect-detail").style.display = "none";
+  document.getElementById("view-prospects").style.display = "none";
+  viewCustomers.style.display = "block";
+  state.currentProspectId = null;
+  renderCustomerList();
+  alert(`${p.firstName} ${p.lastName} has been added as an active customer!`);
+});
