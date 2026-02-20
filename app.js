@@ -1012,7 +1012,8 @@ function updateScheduleTotals(customerId) {
     const span = document.querySelector(`[data-total-period="${period}"]`);
     if (span) {
       span.textContent = `${total} / ${limitMinutes}m`;
-      span.className = total > limitMinutes ? "schedule-total--over" : "";
+      const isOver = total > limitMinutes;
+      span.parentElement.className = isOver ? "schedule-total--over" : "";
     }
   });
 }
@@ -1093,7 +1094,7 @@ function buildScheduleTableHTML(tasks, schedule, limitMinutes) {
         return sum + (task?.minutes || 0);
       }, 0);
       const overClass = total > limitMinutes ? "schedule-total--over" : "";
-      return `<td><span class="${overClass}" data-total-period="${escapeHtml(period)}">${total} / ${limitMinutes}m</span></td>`;
+      return `<td class="${overClass}"><span data-total-period="${escapeHtml(period)}">${total} / ${limitMinutes}m</span></td>`;
     }).join("")
   }</tr>`;
 

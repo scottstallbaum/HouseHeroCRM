@@ -824,6 +824,11 @@ textarea {
   border: 1px solid var(--stroke);
 }
 
+.schedule-total-row td.schedule-total--over {
+  background: #fbd0c0;
+  color: #6d1a0a;
+}
+
 .schedule-total--over {
   color: #6d1a0a;
   font-weight: 700;
