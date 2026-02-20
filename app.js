@@ -16,6 +16,7 @@ const state = {
   editingProspectId: null,
   activePipelineStage: "all",
   schedules: {},
+  scheduleEditMode: false,
 };
 
 // ── DB Mappers ─────────────────────────────────────────────
@@ -951,23 +952,31 @@ async function openScheduleForCustomer(customerId) {
     }
   }
 
-  // Reset task library panel
+  // Reset to view mode
+  state.scheduleEditMode = false;
   const panel = document.getElementById("task-library-panel");
   if (panel) panel.style.display = "none";
   const libBtn = document.getElementById("btn-toggle-task-library");
-  if (libBtn) libBtn.textContent = "Edit Task Library";
+  if (libBtn) { libBtn.textContent = "Edit Task Library"; libBtn.style.display = "none"; }
+  const editBtn = document.getElementById("btn-edit-schedule");
+  if (editBtn) editBtn.textContent = "Edit Schedule";
 
   renderScheduleCard(customerId);
   renderScheduleTaskLibrary(customerId);
 }
 
-// ── Render Schedule Table ──────────────────────────────────
+// ── Render Schedule Card (view or edit mode) ──────────────
 function renderScheduleCard(customerId) {
   const sched = state.schedules[customerId];
   const el = document.getElementById("schedule-card-body");
   if (!el || !sched) return;
   const c = getCustomer(customerId);
   const limitMinutes = c?.minutesLimit || 75;
+
+  if (!state.scheduleEditMode) {
+    el.innerHTML = buildScheduleSummaryHTML(sched.tasks, sched.schedule, limitMinutes);
+    return;
+  }
 
   el.innerHTML = buildScheduleTableHTML(sched.tasks, sched.schedule, limitMinutes);
 
@@ -1008,6 +1017,34 @@ function updateScheduleTotals(customerId) {
   });
 }
 
+function buildScheduleSummaryHTML(tasks, schedule, limitMinutes) {
+  const anyTasks = SCHEDULE_PERIODS.some(p => {
+    const ids = schedule[p];
+    return Array.isArray(ids) && ids.length > 0;
+  });
+
+  if (!anyTasks) {
+    return `<div class="empty-state"><p>No tasks scheduled yet.</p><p>Click <strong>Edit Schedule</strong> to build this customer's annual plan.</p></div>`;
+  }
+
+  const cols = SCHEDULE_PERIODS.map(period => {
+    const ids = Array.isArray(schedule[period]) ? schedule[period] : [];
+    const periodTasks = ids.map(id => tasks.find(t => t.id === id)).filter(Boolean);
+    const total = periodTasks.reduce((sum, t) => sum + t.minutes, 0);
+    const overClass = total > limitMinutes ? "schedule-total--over" : "";
+    const taskItems = periodTasks.length
+      ? periodTasks.map(t => `<li><span>${escapeHtml(t.name)}</span><span class="task-min">${t.minutes}m</span></li>`).join("")
+      : `<li style="color:var(--muted);font-style:italic;">No tasks</li>`;
+    return `<div class="sched-summary-col">
+      <div class="sched-summary-period">${escapeHtml(period)}</div>
+      <ul class="master-sched-tasks" style="flex-direction:column;gap:0.25rem;margin-top:0.4rem;">${taskItems}</ul>
+      ${total > 0 ? `<div class="sched-summary-total ${overClass}">${total} / ${limitMinutes}m</div>` : ""}
+    </div>`;
+  }).join("");
+
+  return `<div class="sched-summary-grid">${cols}</div>`;
+}
+
 function buildScheduleTableHTML(tasks, schedule, limitMinutes) {
   const headerCols = SCHEDULE_PERIODS.map(p => `<th>${escapeHtml(p)}</th>`).join("");
 
@@ -1046,6 +1083,19 @@ function buildScheduleTableHTML(tasks, schedule, limitMinutes) {
     <tbody>${bodyRows}${totalsRow}</tbody>
   </table></div>`;
 }
+
+// ── Schedule view/edit toggle ─────────────────────────────
+document.getElementById("btn-edit-schedule").addEventListener("click", () => {
+  state.scheduleEditMode = !state.scheduleEditMode;
+  document.getElementById("btn-edit-schedule").textContent = state.scheduleEditMode ? "Done" : "Edit Schedule";
+  const libBtn = document.getElementById("btn-toggle-task-library");
+  libBtn.style.display = state.scheduleEditMode ? "" : "none";
+  if (!state.scheduleEditMode) {
+    document.getElementById("task-library-panel").style.display = "none";
+    libBtn.textContent = "Edit Task Library";
+  }
+  renderScheduleCard(state.currentCustomerId);
+});
 
 // ── Task Library ───────────────────────────────────────────
 document.getElementById("btn-toggle-task-library").addEventListener("click", () => {

@@ -667,6 +667,49 @@ textarea {
   border-top: 1px solid var(--stroke);
 }
 
+/* ── Schedule Summary (read-only) ─────────────────────────── */
+.sched-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 0.75rem;
+}
+
+@media (max-width: 1100px) {
+  .sched-summary-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+@media (max-width: 680px) {
+  .sched-summary-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+.sched-summary-col {
+  background: var(--panel);
+  border: 1px solid var(--stroke);
+  border-radius: 10px;
+  padding: 0.75rem;
+}
+
+.sched-summary-period {
+  font-family: "Fraunces", Georgia, serif;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 0.4rem;
+}
+
+.sched-summary-total {
+  font-size: 0.73rem;
+  font-weight: 700;
+  color: var(--muted);
+  margin-top: 0.5rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid var(--stroke);
+}
+
+.sched-summary-total.schedule-total--over {
+  color: #6d1a0a;
+}
+
 /* ── Schedule Table ───────────────────────────────────────── */
 .schedule-table-wrap {
   overflow-x: auto;

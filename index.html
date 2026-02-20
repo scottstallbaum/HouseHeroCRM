@@ -136,7 +136,10 @@
             <div>
               <h2 style="margin:0;">Annual Schedule <span id="schedule-year" style="color:var(--muted);font-size:1rem;font-family:'Space Mono',monospace;"></span></h2>
             </div>
-            <button id="btn-toggle-task-library" type="button" class="ghost ghost--small">Edit Task Library</button>
+            <div style="display:flex;gap:0.5rem;">
+              <button id="btn-edit-schedule" type="button" class="ghost ghost--small">Edit Schedule</button>
+              <button id="btn-toggle-task-library" type="button" class="ghost ghost--small" style="display:none;">Edit Task Library</button>
+            </div>
           </div>
           <div id="schedule-card-body" style="margin-top:1rem;">
             <div class="empty-state"><p>Loading schedule...</p></div>
