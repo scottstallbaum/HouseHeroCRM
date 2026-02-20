@@ -133,6 +133,7 @@ function openCustomer(id) {
     window.open(`https://scottstallbaum.github.io/HouseHeroSchedulerv1/?customer=${encodeURIComponent(c.firstName + " " + c.lastName)}`, "_blank");
   };
 
+  renderAccountHolders(c);
   renderContacts(c);
   renderNotes(c);
 
@@ -146,6 +147,26 @@ btnBack.addEventListener("click", () => {
   state.currentCustomerId = null;
   renderCustomerList(searchInput.value);
 });
+
+// ── Account Holders ───────────────────────────────────────
+function renderAccountHolders(c) {
+  const el = document.getElementById("account-holders");
+  const holderCard = (label, h) => `
+    <div class="holder-card">
+      <div class="holder-card__label">${escapeHtml(label)}</div>
+      <div class="holder-card__name">${escapeHtml(h.firstName)} ${escapeHtml(h.lastName)}</div>
+      ${h.phone ? `<div class="holder-card__row">&#128222; <a href="tel:${escapeHtml(h.phone)}">${escapeHtml(h.phone)}</a></div>` : ""}
+      ${h.email ? `<div class="holder-card__row">&#9993; <a href="mailto:${escapeHtml(h.email)}">${escapeHtml(h.email)}</a></div>` : ""}
+    </div>`;
+  let html = holderCard("Primary", { firstName: c.firstName, lastName: c.lastName, phone: c.phone, email: c.email });
+  if (c.secondary?.firstName) {
+    const relLabel = c.secondary.relationship
+      ? c.secondary.relationship.charAt(0).toUpperCase() + c.secondary.relationship.slice(1)
+      : "Secondary";
+    html += holderCard(relLabel, c.secondary);
+  }
+  el.innerHTML = html;
+}
 
 // ── Contacts ───────────────────────────────────────────────
 function renderContacts(c) {
@@ -386,6 +407,7 @@ document.getElementById("form-customer").addEventListener("submit", e => {
       // Update detail view header
       document.getElementById("detail-name").textContent = `${data.firstName} ${data.lastName}`;
       document.getElementById("detail-address").textContent = getFullAddress(data);
+      renderAccountHolders(state.customers[idx]);
     }
   } else {
     state.customers.push({

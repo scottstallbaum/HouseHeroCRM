@@ -585,3 +585,71 @@ textarea {
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
+
+/*  Account Holders  */
+.account-holders-grid {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.holder-card {
+  flex: 1;
+  min-width: 180px;
+  background: var(--accent-light);
+  border: 1px solid var(--stroke);
+  border-radius: 8px;
+  padding: 0.9rem 1.1rem;
+}
+
+.holder-card__label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  font-weight: 700;
+  margin-bottom: 0.35rem;
+}
+
+.holder-card__name {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 0.4rem;
+}
+
+.holder-card__row {
+  font-size: 0.88rem;
+  color: var(--text);
+  margin-bottom: 0.2rem;
+}
+
+.holder-card__row a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.holder-card__row a:hover {
+  text-decoration: underline;
+}
+
+/*  Muted card (Additional Contacts)  */
+.card--muted {
+  opacity: 0.75;
+  background: var(--bg);
+}
+
+.card--muted:hover {
+  opacity: 1;
+}
+
+.card__title--small {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.ghost--small {
+  font-size: 0.78rem;
+  padding: 0.2rem 0.6rem;
+}
