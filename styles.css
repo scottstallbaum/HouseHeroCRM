@@ -689,6 +689,11 @@ textarea {
   padding: 0.75rem;
 }
 
+.sched-summary-col--over {
+  background: #fff1ee;
+  border-color: #f0b4a4;
+}
+
 .sched-summary-period {
   font-family: "Fraunces", Georgia, serif;
   font-size: 0.85rem;
@@ -697,11 +702,41 @@ textarea {
   margin-bottom: 0.4rem;
 }
 
+.sched-summary-task-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.sched-summary-cat-label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--accent);
+  font-weight: 700;
+  margin-top: 0.55rem;
+  margin-bottom: 0.15rem;
+  padding-bottom: 0.15rem;
+  border-bottom: 1px solid var(--stroke);
+}
+
+.sched-summary-task {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+  padding: 0.15rem 0;
+}
+
 .sched-summary-total {
   font-size: 0.73rem;
   font-weight: 700;
   color: var(--muted);
-  margin-top: 0.5rem;
+  margin-top: 0.6rem;
   padding-top: 0.4rem;
   border-top: 1px solid var(--stroke);
 }

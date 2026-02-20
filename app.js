@@ -1031,14 +1031,33 @@ function buildScheduleSummaryHTML(tasks, schedule, limitMinutes) {
     const ids = Array.isArray(schedule[period]) ? schedule[period] : [];
     const periodTasks = ids.map(id => tasks.find(t => t.id === id)).filter(Boolean);
     const total = periodTasks.reduce((sum, t) => sum + t.minutes, 0);
-    const overClass = total > limitMinutes ? "schedule-total--over" : "";
-    const taskItems = periodTasks.length
-      ? periodTasks.map(t => `<li><span>${escapeHtml(t.name)}</span><span class="task-min">${t.minutes}m</span></li>`).join("")
-      : `<li style="color:var(--muted);font-style:italic;">No tasks</li>`;
-    return `<div class="sched-summary-col">
+    const isOver = total > limitMinutes;
+    const overColClass = isOver ? " sched-summary-col--over" : "";
+    const overTotalClass = isOver ? " schedule-total--over" : "";
+
+    // Group by category
+    let taskItems = "";
+    if (periodTasks.length === 0) {
+      taskItems = `<li style="color:var(--muted);font-style:italic;">No tasks</li>`;
+    } else {
+      const grouped = {};
+      periodTasks.forEach(t => {
+        const cat = t.category || "Other";
+        if (!grouped[cat]) grouped[cat] = [];
+        grouped[cat].push(t);
+      });
+      taskItems = SCHEDULE_CATEGORIES
+        .filter(cat => grouped[cat])
+        .map(cat => `
+          <li class="sched-summary-cat-label">${escapeHtml(cat)}</li>
+          ${grouped[cat].map(t => `<li class="sched-summary-task"><span>${escapeHtml(t.name)}</span><span class="task-min">${t.minutes}m</span></li>`).join("")}
+        `).join("");
+    }
+
+    return `<div class="sched-summary-col${overColClass}">
       <div class="sched-summary-period">${escapeHtml(period)}</div>
-      <ul class="master-sched-tasks" style="flex-direction:column;gap:0.25rem;margin-top:0.4rem;">${taskItems}</ul>
-      ${total > 0 ? `<div class="sched-summary-total ${overClass}">${total} / ${limitMinutes}m</div>` : ""}
+      <ul class="sched-summary-task-list">${taskItems}</ul>
+      ${total > 0 ? `<div class="sched-summary-total${overTotalClass}">${total} / ${limitMinutes}m</div>` : ""}
     </div>`;
   }).join("");
 
