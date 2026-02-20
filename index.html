@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>House Hero CRM</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,700;0,900;1,400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <img src="logo.png" alt="House Hero" class="sidebar__logo"
+        onerror="this.style.display='none'; document.getElementById('brand-fallback').style.display='block'" />
+      <div id="brand-fallback" style="display:none">
+        <div class="sidebar__brand-name">House Hero</div>
+        <div class="sidebar__brand-sub">CRM</div>
+      </div>
+    </div>
+    <nav class="sidebar__nav">
+      <a href="#" class="sidebar__link sidebar__link--active" data-view="customers">
+        <span class="sidebar__icon">👥</span> Customers
+      </a>
+      <a href="https://scottstallbaum.github.io/HouseHeroSchedulerv1/" class="sidebar__link" target="_blank">
+        <span class="sidebar__icon">📅</span> Scheduler ↗
+      </a>
+    </nav>
+    <div class="sidebar__footer">
+      <div class="sidebar__footer-text">House Hero LLC</div>
+      <div class="sidebar__footer-sub">PA Registered &amp; Insured</div>
+    </div>
+  </aside>
+
+  <!-- Main content -->
+  <main class="main">
+
+    <!-- Customer List View -->
+    <div id="view-customers" class="view">
+      <div class="view__header">
+        <div>
+          <h1 class="view__title">Customers</h1>
+          <p class="view__subtitle" id="customer-count">Loading...</p>
+        </div>
+        <button id="btn-add-customer" type="button">+ Add Customer</button>
+      </div>
+
+      <div class="search-bar">
+        <input id="search-input" type="text" placeholder="Search by name, address or phone..." />
+      </div>
+
+      <div id="customer-list" class="customer-list">
+        <!-- populated by JS -->
+      </div>
+    </div>
+
+    <!-- Customer Detail View -->
+    <div id="view-detail" class="view" style="display:none;">
+      <div class="view__header">
+        <div>
+          <button id="btn-back" class="ghost btn-back" type="button">← Back to customers</button>
+          <h1 class="view__title" id="detail-name">Customer Name</h1>
+          <p class="view__subtitle" id="detail-address"></p>
+        </div>
+        <div class="detail-actions">
+          <button id="btn-open-scheduler" type="button" class="ghost" onclick="">📅 Open in Scheduler</button>
+          <button id="btn-edit-customer" type="button" class="ghost">Edit</button>
+          <button id="btn-delete-customer" type="button" class="ghost danger">Delete</button>
+        </div>
+      </div>
+
+      <div class="detail-grid">
+
+        <!-- Contacts -->
+        <section class="card">
+          <div class="card__header">
+            <h2>Contacts</h2>
+            <button id="btn-add-contact" type="button" class="ghost">+ Add Contact</button>
+          </div>
+          <div id="contact-list" class="contact-list"></div>
+        </section>
+
+        <!-- Notes -->
+        <section class="card">
+          <div class="card__header">
+            <h2>Notes</h2>
+            <button id="btn-add-note" type="button" class="ghost">+ Add Note</button>
+          </div>
+          <div id="note-list" class="note-list"></div>
+        </section>
+
+        <!-- Service Info -->
+        <section class="card card--full">
+          <div class="card__header">
+            <h2>Service Details</h2>
+          </div>
+          <div class="service-grid">
+            <label>
+              Plan
+              <select id="detail-plan">
+                <option value="">-- Select plan --</option>
+                <option value="good-neighbor">Good Neighbor ($74/mo)</option>
+                <option value="hero-pro">Hero Pro ($135/mo)</option>
+                <option value="custom">Custom</option>
+              </select>
+            </label>
+            <label>
+              Start Date
+              <input type="date" id="detail-start-date" />
+            </label>
+            <label>
+              Minutes Limit per Visit
+              <input type="number" id="detail-minutes" min="30" max="180" value="75" />
+            </label>
+            <label>
+              Status
+              <select id="detail-status">
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+                <option value="prospect">Prospect</option>
+              </select>
+            </label>
+          </div>
+          <button id="btn-save-service" type="button" style="margin-top:1rem;">Save Service Details</button>
+        </section>
+
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Modal: Add/Edit Customer -->
+  <div id="modal-customer" class="modal" style="display:none;">
+    <div class="modal__box">
+      <div class="modal__header">
+        <h2 id="modal-customer-title">Add Customer</h2>
+        <button class="modal__close" data-close="modal-customer" type="button">✕</button>
+      </div>
+      <form id="form-customer">
+        <div class="form-grid">
+          <label>
+            First Name *
+            <input type="text" id="cust-first" required placeholder="John" />
+          </label>
+          <label>
+            Last Name *
+            <input type="text" id="cust-last" required placeholder="Smith" />
+          </label>
+          <label class="span-2">
+            Address *
+            <input type="text" id="cust-address" required placeholder="123 Maple Drive, Mountain Top, PA 18707" />
+          </label>
+          <label>
+            Email
+            <input type="email" id="cust-email" placeholder="john@email.com" />
+          </label>
+          <label>
+            Phone
+            <input type="tel" id="cust-phone" placeholder="(570) 555-1234" />
+          </label>
+        </div>
+        <div class="modal__actions">
+          <button type="submit">Save Customer</button>
+          <button type="button" class="ghost" data-close="modal-customer">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Add/Edit Contact -->
+  <div id="modal-contact" class="modal" style="display:none;">
+    <div class="modal__box">
+      <div class="modal__header">
+        <h2 id="modal-contact-title">Add Contact</h2>
+        <button class="modal__close" data-close="modal-contact" type="button">✕</button>
+      </div>
+      <form id="form-contact">
+        <div class="form-grid">
+          <label>
+            First Name *
+            <input type="text" id="contact-first" required placeholder="Mary" />
+          </label>
+          <label>
+            Last Name *
+            <input type="text" id="contact-last" required placeholder="Smith" />
+          </label>
+          <label>
+            Role
+            <input type="text" id="contact-role" placeholder="e.g. Spouse, Property Manager" />
+          </label>
+          <label>
+            Email
+            <input type="email" id="contact-email" placeholder="mary@email.com" />
+          </label>
+          <label>
+            Phone
+            <input type="tel" id="contact-phone" placeholder="(570) 555-5678" />
+          </label>
+          <label>
+            Preferred Contact
+            <select id="contact-preferred">
+              <option value="phone">Phone</option>
+              <option value="email">Email</option>
+              <option value="text">Text</option>
+            </select>
+          </label>
+        </div>
+        <div class="modal__actions">
+          <button type="submit">Save Contact</button>
+          <button type="button" class="ghost" data-close="modal-contact">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Add Note -->
+  <div id="modal-note" class="modal" style="display:none;">
+    <div class="modal__box modal__box--narrow">
+      <div class="modal__header">
+        <h2>Add Note</h2>
+        <button class="modal__close" data-close="modal-note" type="button">✕</button>
+      </div>
+      <form id="form-note">
+        <label>
+          Note
+          <textarea id="note-text" rows="5" placeholder="Enter note here..." required></textarea>
+        </label>
+        <div class="modal__actions">
+          <button type="submit">Save Note</button>
+          <button type="button" class="ghost" data-close="modal-note">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
