@@ -1,23 +1,99 @@
-// ── Storage keys ──────────────────────────────────────────
-const CUSTOMERS_KEY = "hhcrm_customers";
+// ── Supabase ───────────────────────────────────────────────
+const { createClient } = window.supabase;
+const sb = createClient(
+  "https://qjnzyheszvkfwlgjudgo.supabase.co",
+  "sb_publishable_0y9KuBZHM6Vo82eLWbLKwg_B19lsoIB"
+);
 
-// ── State ─────────────────────────────────────────────────
+// ── State ──────────────────────────────────────────────────
 const state = {
-  customers: loadCustomers(),
+  customers: [],
   currentCustomerId: null,
   editingCustomerId: null,
   editingContactId: null,
+  prospects: [],
+  currentProspectId: null,
+  editingProspectId: null,
+  activePipelineStage: "all",
 };
 
-// ── Load / Save ────────────────────────────────────────────
-function loadCustomers() {
-  const raw = localStorage.getItem(CUSTOMERS_KEY);
-  if (!raw) return [];
-  try { return JSON.parse(raw); } catch { return []; }
+// ── DB Mappers ─────────────────────────────────────────────
+function customerFromDb(row) {
+  return {
+    id: row.id,
+    firstName: row.first_name,
+    lastName: row.last_name,
+    street: row.street || "",
+    city: row.city || "",
+    state: row.state || "",
+    zip: row.zip || "",
+    email: row.email || "",
+    phone: row.phone || "",
+    status: row.status || "active",
+    plan: row.plan || "",
+    startDate: row.start_date || "",
+    minutesLimit: row.minutes_limit || 75,
+    secondary: row.secondary || null,
+    contacts: row.contacts || [],
+    notes: row.notes || [],
+  };
 }
 
-function saveCustomers() {
-  localStorage.setItem(CUSTOMERS_KEY, JSON.stringify(state.customers));
+function customerToDb(c) {
+  return {
+    first_name: c.firstName,
+    last_name: c.lastName,
+    street: c.street || null,
+    city: c.city || null,
+    state: c.state || null,
+    zip: c.zip || null,
+    email: c.email || null,
+    phone: c.phone || null,
+    status: c.status || "active",
+    plan: c.plan || null,
+    start_date: c.startDate || null,
+    minutes_limit: c.minutesLimit || 75,
+    secondary: c.secondary || null,
+    contacts: c.contacts || [],
+    notes: c.notes || [],
+  };
+}
+
+function prospectFromDb(row) {
+  return {
+    id: row.id,
+    firstName: row.first_name,
+    lastName: row.last_name,
+    street: row.street || "",
+    city: row.city || "",
+    state: row.state || "",
+    zip: row.zip || "",
+    email: row.email || "",
+    phone: row.phone || "",
+    stage: row.stage || "new",
+    source: row.source || "",
+    lastContactDate: row.last_contact_date || "",
+    followUpDate: row.follow_up_date || "",
+    notes: row.notes || [],
+  };
+}
+
+function prospectToDb(p) {
+  return {
+    first_name: p.firstName,
+    last_name: p.lastName,
+    street: p.street || null,
+    city: p.city || null,
+    state: p.state || null,
+    zip: p.zip || null,
+    email: p.email || null,
+    phone: p.phone || null,
+    stage: p.stage || "new",
+    source: p.source || null,
+    last_contact_date: p.lastContactDate || null,
+    follow_up_date: p.followUpDate || null,
+    notes: p.notes || [],
+  };
 }
 
 // ── Helpers ────────────────────────────────────────────────
@@ -44,25 +120,71 @@ function getCustomer(id) {
 function getFullAddress(c) {
   const parts = [c.street, c.city, c.state ? c.state.toUpperCase() : null, c.zip].filter(Boolean);
   if (parts.length) return parts.join(", ");
-  return c.address || ""; // backward compat for old single-field records
+  return c.address || "";
+}
+
+// ── Supabase DB Operations ─────────────────────────────────
+async function dbInsertCustomer(data) {
+  const { data: row, error } = await sb.from("customers").insert(customerToDb(data)).select().single();
+  if (error) { console.error(error); alert("Error saving customer: " + error.message); return null; }
+  return customerFromDb(row);
+}
+
+async function dbUpdateCustomer(c) {
+  const { error } = await sb.from("customers").update(customerToDb(c)).eq("id", c.id);
+  if (error) console.error("Update customer error:", error);
+}
+
+async function dbDeleteCustomer(id) {
+  const { error } = await sb.from("customers").delete().eq("id", id);
+  if (error) console.error("Delete customer error:", error);
+}
+
+async function dbInsertProspect(data) {
+  const { data: row, error } = await sb.from("prospects").insert(prospectToDb(data)).select().single();
+  if (error) { console.error(error); alert("Error saving prospect: " + error.message); return null; }
+  return prospectFromDb(row);
+}
+
+async function dbUpdateProspect(p) {
+  const { error } = await sb.from("prospects").update(prospectToDb(p)).eq("id", p.id);
+  if (error) console.error("Update prospect error:", error);
+}
+
+async function dbDeleteProspect(id) {
+  const { error } = await sb.from("prospects").delete().eq("id", id);
+  if (error) console.error("Delete prospect error:", error);
 }
 
 // ── Elements ───────────────────────────────────────────────
-const viewCustomers    = document.getElementById("view-customers");
-const viewDetail       = document.getElementById("view-detail");
-const customerList     = document.getElementById("customer-list");
-const customerCount    = document.getElementById("customer-count");
-const searchInput      = document.getElementById("search-input");
-const btnAddCustomer   = document.getElementById("btn-add-customer");
-const btnBack          = document.getElementById("btn-back");
-const btnEditCustomer  = document.getElementById("btn-edit-customer");
-const btnDeleteCustomer= document.getElementById("btn-delete-customer");
-const btnAddContact    = document.getElementById("btn-add-contact");
-const btnAddNote       = document.getElementById("btn-add-note");
-const btnSaveService   = document.getElementById("btn-save-service");
+const viewCustomers     = document.getElementById("view-customers");
+const viewDetail        = document.getElementById("view-detail");
+const customerList      = document.getElementById("customer-list");
+const customerCount     = document.getElementById("customer-count");
+const searchInput       = document.getElementById("search-input");
+const btnAddCustomer    = document.getElementById("btn-add-customer");
+const btnBack           = document.getElementById("btn-back");
+const btnEditCustomer   = document.getElementById("btn-edit-customer");
+const btnDeleteCustomer = document.getElementById("btn-delete-customer");
+const btnAddContact     = document.getElementById("btn-add-contact");
+const btnAddNote        = document.getElementById("btn-add-note");
+const btnSaveService    = document.getElementById("btn-save-service");
 
 // ── Init ───────────────────────────────────────────────────
-renderCustomerList();
+async function init() {
+  customerList.innerHTML = `<div class="empty-state"><p>Loading...</p></div>`;
+  const [custResult, prospResult] = await Promise.all([
+    sb.from("customers").select("*").order("created_at", { ascending: false }),
+    sb.from("prospects").select("*").order("created_at", { ascending: false }),
+  ]);
+  if (custResult.error) console.error("Load customers error:", custResult.error);
+  if (prospResult.error) console.error("Load prospects error:", prospResult.error);
+  state.customers = (custResult.data || []).map(customerFromDb);
+  state.prospects = (prospResult.data || []).map(prospectFromDb);
+  renderCustomerList();
+}
+
+init();
 
 // ── Customer List ──────────────────────────────────────────
 function renderCustomerList(filter = "") {
@@ -94,10 +216,10 @@ function renderCustomerList(filter = "") {
       <div>
         <div class="customer-card__name">${escapeHtml(c.firstName)} ${escapeHtml(c.lastName)}${c.secondary?.firstName ? ` <span class="customer-card__secondary">&amp; ${escapeHtml(c.secondary.firstName)} ${escapeHtml(c.secondary.lastName)} <span class="customer-card__rel">(${escapeHtml(c.secondary.relationship || "secondary")})</span></span>` : ""}</div>
         <div class="customer-card__meta">
-          ${getFullAddress(c) ? `<span>📍 ${escapeHtml(getFullAddress(c))}</span>` : ""}
-          ${c.phone ? `<span>📞 ${escapeHtml(c.phone)}</span>` : ""}
-          ${c.email ? `<span>✉️ ${escapeHtml(c.email)}</span>` : ""}
-          ${c.startDate ? `<span>📅 Since ${formatDate(c.startDate)}</span>` : ""}
+          ${getFullAddress(c) ? `<span>&#128205; ${escapeHtml(getFullAddress(c))}</span>` : ""}
+          ${c.phone ? `<span>&#128222; ${escapeHtml(c.phone)}</span>` : ""}
+          ${c.email ? `<span>&#9993; ${escapeHtml(c.email)}</span>` : ""}
+          ${c.startDate ? `<span>&#128197; Since ${formatDate(c.startDate)}</span>` : ""}
         </div>
       </div>
       <div>
@@ -148,7 +270,7 @@ btnBack.addEventListener("click", () => {
   renderCustomerList(searchInput.value);
 });
 
-// ── Account Holders ───────────────────────────────────────
+// ── Account Holders ────────────────────────────────────────
 function renderAccountHolders(c) {
   const el = document.getElementById("account-holders");
   const holderCard = (label, h) => `
@@ -183,14 +305,14 @@ function renderContacts(c) {
       <div>
         <div class="contact-item__name">${escapeHtml(ct.firstName)} ${escapeHtml(ct.lastName)}${ct.role ? ` <span style="font-weight:400;font-size:0.82rem;color:var(--muted);">— ${escapeHtml(ct.role)}</span>` : ""}</div>
         <div class="contact-item__meta">
-          ${ct.phone ? `📞 ${escapeHtml(ct.phone)}<br>` : ""}
-          ${ct.email ? `✉️ ${escapeHtml(ct.email)}<br>` : ""}
+          ${ct.phone ? `&#128222; ${escapeHtml(ct.phone)}<br>` : ""}
+          ${ct.email ? `&#9993; ${escapeHtml(ct.email)}<br>` : ""}
           ${ct.preferred ? `Prefers: ${escapeHtml(ct.preferred)}` : ""}
         </div>
       </div>
       <div class="contact-item__actions">
         <button class="ghost icon-btn" data-action="edit-contact" data-id="${ct.id}">Edit</button>
-        <button class="ghost danger icon-btn" data-action="delete-contact" data-id="${ct.id}">✕</button>
+        <button class="ghost danger icon-btn" data-action="delete-contact" data-id="${ct.id}">&#10005;</button>
       </div>
     </div>
   `).join("");
@@ -229,14 +351,14 @@ function openEditContact(c, contactId) {
   openModal("modal-contact");
 }
 
-function deleteContact(c, contactId) {
+async function deleteContact(c, contactId) {
   if (!confirm("Delete this contact?")) return;
   c.contacts = (c.contacts || []).filter(x => x.id !== contactId);
-  saveCustomers();
+  await dbUpdateCustomer(c);
   renderContacts(c);
 }
 
-document.getElementById("form-contact").addEventListener("submit", e => {
+document.getElementById("form-contact").addEventListener("submit", async e => {
   e.preventDefault();
   const c = getCustomer(state.currentCustomerId);
   if (!c) return;
@@ -258,7 +380,7 @@ document.getElementById("form-contact").addEventListener("submit", e => {
     c.contacts.push({ id: generateId(), ...data });
   }
 
-  saveCustomers();
+  await dbUpdateCustomer(c);
   renderContacts(c);
   closeModal("modal-contact");
 });
@@ -281,7 +403,7 @@ function renderNotes(c) {
         <div class="note-item__text">${escapeHtml(n.text)}</div>
         <div class="note-item__date">${formatDate(n.createdAt)}</div>
       </div>
-      <button class="ghost danger icon-btn" data-action="delete-note" data-id="${n.id}">✕</button>
+      <button class="ghost danger icon-btn" data-action="delete-note" data-id="${n.id}">&#10005;</button>
     </div>
   `).join("");
 
@@ -290,14 +412,14 @@ function renderNotes(c) {
   });
 }
 
-function deleteNote(c, noteId) {
+async function deleteNote(c, noteId) {
   if (!confirm("Delete this note?")) return;
   c.notes = (c.notes || []).filter(n => n.id !== noteId);
-  saveCustomers();
+  await dbUpdateCustomer(c);
   renderNotes(c);
 }
 
-document.getElementById("form-note").addEventListener("submit", e => {
+document.getElementById("form-note").addEventListener("submit", async e => {
   e.preventDefault();
   const c = getCustomer(state.currentCustomerId);
   if (!c) return;
@@ -309,7 +431,7 @@ document.getElementById("form-note").addEventListener("submit", e => {
     createdAt: new Date().toISOString(),
   });
 
-  saveCustomers();
+  await dbUpdateCustomer(c);
   renderNotes(c);
   closeModal("modal-note");
   document.getElementById("note-text").value = "";
@@ -318,16 +440,16 @@ document.getElementById("form-note").addEventListener("submit", e => {
 btnAddNote.addEventListener("click", () => openModal("modal-note"));
 
 // ── Service Details ────────────────────────────────────────
-btnSaveService.addEventListener("click", () => {
+btnSaveService.addEventListener("click", async () => {
   const c = getCustomer(state.currentCustomerId);
   if (!c) return;
   c.plan = document.getElementById("detail-plan").value;
   c.startDate = document.getElementById("detail-start-date").value;
   c.minutesLimit = Number(document.getElementById("detail-minutes").value) || 75;
   c.status = document.getElementById("detail-status").value;
-  saveCustomers();
+  await dbUpdateCustomer(c);
 
-  btnSaveService.textContent = "Saved ✓";
+  btnSaveService.textContent = "Saved \u2713";
   setTimeout(() => { btnSaveService.textContent = "Save Service Details"; }, 2000);
   renderCustomerList(searchInput.value);
 });
@@ -375,7 +497,7 @@ btnEditCustomer.addEventListener("click", () => {
   openModal("modal-customer");
 });
 
-document.getElementById("form-customer").addEventListener("submit", e => {
+document.getElementById("form-customer").addEventListener("submit", async e => {
   e.preventDefault();
   const data = {
     firstName: document.getElementById("cust-first").value.trim(),
@@ -395,7 +517,6 @@ document.getElementById("form-customer").addEventListener("submit", e => {
       email: document.getElementById("cust-second-email").value.trim(),
     },
   };
-  // Clear secondary if no name entered
   if (!data.secondary.firstName && !data.secondary.lastName) {
     data.secondary = null;
   }
@@ -404,33 +525,32 @@ document.getElementById("form-customer").addEventListener("submit", e => {
     const idx = state.customers.findIndex(c => c.id === state.editingCustomerId);
     if (idx !== -1) {
       state.customers[idx] = { ...state.customers[idx], ...data };
-      // Update detail view header
+      await dbUpdateCustomer(state.customers[idx]);
       document.getElementById("detail-name").textContent = `${data.firstName} ${data.lastName}`;
       document.getElementById("detail-address").textContent = getFullAddress(data);
       renderAccountHolders(state.customers[idx]);
     }
   } else {
-    state.customers.push({
-      id: generateId(),
+    const newCustomer = await dbInsertCustomer({
       ...data,
       status: "active",
       contacts: [],
       notes: [],
     });
+    if (newCustomer) state.customers.unshift(newCustomer);
   }
 
-  saveCustomers();
   renderCustomerList(searchInput.value);
   closeModal("modal-customer");
 });
 
 // ── Delete Customer ────────────────────────────────────────
-btnDeleteCustomer.addEventListener("click", () => {
+btnDeleteCustomer.addEventListener("click", async () => {
   const c = getCustomer(state.currentCustomerId);
   if (!c) return;
   if (!confirm(`Delete ${c.firstName} ${c.lastName}? This cannot be undone.`)) return;
+  await dbDeleteCustomer(state.currentCustomerId);
   state.customers = state.customers.filter(x => x.id !== state.currentCustomerId);
-  saveCustomers();
   viewDetail.style.display = "none";
   viewCustomers.style.display = "block";
   state.currentCustomerId = null;
@@ -456,7 +576,7 @@ document.querySelectorAll(".modal").forEach(modal => {
   });
 });
 
-//  Sidebar Nav 
+// ── Sidebar Nav ────────────────────────────────────────────
 document.querySelectorAll(".sidebar__link[data-view]").forEach(link => {
   link.addEventListener("click", e => {
     e.preventDefault();
@@ -477,24 +597,7 @@ document.querySelectorAll(".sidebar__link[data-view]").forEach(link => {
   });
 });
 
-//  Prospects Storage 
-const PROSPECTS_KEY = "hhcrm_prospects";
-
-function loadProspects() {
-  const raw = localStorage.getItem(PROSPECTS_KEY);
-  if (!raw) return [];
-  try { return JSON.parse(raw); } catch { return []; }
-}
-
-function saveProspects() {
-  localStorage.setItem(PROSPECTS_KEY, JSON.stringify(state.prospects));
-}
-
-state.prospects = loadProspects();
-state.currentProspectId = null;
-state.editingProspectId = null;
-state.activePipelineStage = "all";
-
+// ── Prospects ──────────────────────────────────────────────
 function getProspect(id) {
   return state.prospects.find(p => p.id === id);
 }
@@ -504,7 +607,7 @@ function getProspectAddress(p) {
   return parts.length ? parts.join(", ") : "";
 }
 
-//  Pipeline Tabs 
+// ── Pipeline Tabs ──────────────────────────────────────────
 document.getElementById("pipeline-tabs").addEventListener("click", e => {
   const tab = e.target.closest(".pipeline-tab");
   if (!tab) return;
@@ -516,7 +619,7 @@ document.getElementById("pipeline-tabs").addEventListener("click", e => {
 
 document.getElementById("prospect-search-input").addEventListener("input", () => renderProspectList());
 
-//  Render Prospect List 
+// ── Render Prospect List ───────────────────────────────────
 const STAGE_LABELS = {
   new: "New Lead", contacted: "Contacted", "follow-up": "Follow-up",
   consultation: "In-Home Consultation Complete",
@@ -565,7 +668,7 @@ function renderProspectList() {
   });
 }
 
-//  Open Prospect Detail 
+// ── Open Prospect Detail ───────────────────────────────────
 function openProspect(id) {
   state.currentProspectId = id;
   const p = getProspect(id);
@@ -603,7 +706,7 @@ document.getElementById("btn-back-prospect").addEventListener("click", () => {
   renderProspectList();
 });
 
-//  Prospect Notes 
+// ── Prospect Notes ─────────────────────────────────────────
 function renderProspectNotes(p) {
   const list = document.getElementById("prospect-note-list");
   const notes = (p.notes || []).slice().reverse();
@@ -621,10 +724,10 @@ function renderProspectNotes(p) {
     </div>
   `).join("");
   list.querySelectorAll("[data-action='delete-prospect-note']").forEach(btn => {
-    btn.addEventListener("click", () => {
+    btn.addEventListener("click", async () => {
       if (!confirm("Delete this note?")) return;
       p.notes = (p.notes || []).filter(n => n.id !== btn.dataset.id);
-      saveProspects();
+      await dbUpdateProspect(p);
       renderProspectNotes(p);
     });
   });
@@ -632,33 +735,33 @@ function renderProspectNotes(p) {
 
 document.getElementById("btn-add-prospect-note").addEventListener("click", () => openModal("modal-prospect-note"));
 
-document.getElementById("form-prospect-note").addEventListener("submit", e => {
+document.getElementById("form-prospect-note").addEventListener("submit", async e => {
   e.preventDefault();
   const p = getProspect(state.currentProspectId);
   if (!p) return;
   if (!p.notes) p.notes = [];
   p.notes.push({ id: generateId(), text: document.getElementById("prospect-note-text").value.trim(), createdAt: new Date().toISOString() });
-  saveProspects();
+  await dbUpdateProspect(p);
   renderProspectNotes(p);
   closeModal("modal-prospect-note");
   document.getElementById("prospect-note-text").value = "";
 });
 
-//  Save Pipeline Status 
-document.getElementById("btn-save-prospect-status").addEventListener("click", () => {
+// ── Save Pipeline Status ───────────────────────────────────
+document.getElementById("btn-save-prospect-status").addEventListener("click", async () => {
   const p = getProspect(state.currentProspectId);
   if (!p) return;
   p.stage = document.getElementById("prospect-stage").value;
   p.source = document.getElementById("prospect-source").value;
   p.lastContactDate = document.getElementById("prospect-last-contact").value;
   p.followUpDate = document.getElementById("prospect-followup").value;
-  saveProspects();
+  await dbUpdateProspect(p);
   const btn = document.getElementById("btn-save-prospect-status");
   btn.textContent = "Saved \u2713";
   setTimeout(() => { btn.textContent = "Save Status"; }, 2000);
 });
 
-//  Add / Edit Prospect Modal 
+// ── Add / Edit Prospect Modal ──────────────────────────────
 document.getElementById("btn-add-prospect").addEventListener("click", () => {
   state.editingProspectId = null;
   document.getElementById("modal-prospect-title").textContent = "Add Prospect";
@@ -690,7 +793,7 @@ document.getElementById("btn-edit-prospect").addEventListener("click", () => {
   openModal("modal-prospect");
 });
 
-document.getElementById("form-prospect").addEventListener("submit", e => {
+document.getElementById("form-prospect").addEventListener("submit", async e => {
   e.preventDefault();
   const data = {
     firstName: document.getElementById("prospect-first").value.trim(),
@@ -706,50 +809,57 @@ document.getElementById("form-prospect").addEventListener("submit", e => {
     lastContactDate: document.getElementById("prospect-form-last-contact").value,
     followUpDate: document.getElementById("prospect-form-followup").value,
   };
+
   if (state.editingProspectId) {
     const idx = state.prospects.findIndex(p => p.id === state.editingProspectId);
     if (idx !== -1) {
       state.prospects[idx] = { ...state.prospects[idx], ...data };
+      await dbUpdateProspect(state.prospects[idx]);
       document.getElementById("prospect-detail-name").textContent = `${data.firstName} ${data.lastName}`;
       document.getElementById("prospect-detail-address").textContent = getProspectAddress(data);
     }
   } else {
-    state.prospects.push({ id: generateId(), ...data, notes: [], createdAt: new Date().toISOString() });
+    const newProspect = await dbInsertProspect({ ...data, notes: [] });
+    if (newProspect) state.prospects.unshift(newProspect);
   }
-  saveProspects();
+
   renderProspectList();
   closeModal("modal-prospect");
 });
 
-//  Delete Prospect 
-document.getElementById("btn-delete-prospect").addEventListener("click", () => {
+// ── Delete Prospect ────────────────────────────────────────
+document.getElementById("btn-delete-prospect").addEventListener("click", async () => {
   const p = getProspect(state.currentProspectId);
   if (!p) return;
   if (!confirm(`Delete ${p.firstName} ${p.lastName}? This cannot be undone.`)) return;
+  await dbDeleteProspect(state.currentProspectId);
   state.prospects = state.prospects.filter(x => x.id !== state.currentProspectId);
-  saveProspects();
   document.getElementById("view-prospect-detail").style.display = "none";
   document.getElementById("view-prospects").style.display = "block";
   state.currentProspectId = null;
   renderProspectList();
 });
 
-//  Convert Prospect to Customer 
-document.getElementById("btn-convert-prospect").addEventListener("click", () => {
+// ── Convert Prospect to Customer ───────────────────────────
+document.getElementById("btn-convert-prospect").addEventListener("click", async () => {
   const p = getProspect(state.currentProspectId);
   if (!p) return;
   if (!confirm(`Convert ${p.firstName} ${p.lastName} to an active customer?`)) return;
-  state.customers.push({
-    id: generateId(),
+
+  const newCustomer = await dbInsertCustomer({
     firstName: p.firstName, lastName: p.lastName,
     street: p.street || "", city: p.city || "", state: p.state || "", zip: p.zip || "",
     email: p.email || "", phone: p.phone || "",
     status: "active", notes: p.notes || [], contacts: [],
     startDate: new Date().toISOString().slice(0, 10), secondary: null,
   });
-  saveCustomers();
-  state.prospects = state.prospects.filter(x => x.id !== state.currentProspectId);
-  saveProspects();
+
+  if (newCustomer) {
+    state.customers.unshift(newCustomer);
+    await dbDeleteProspect(state.currentProspectId);
+    state.prospects = state.prospects.filter(x => x.id !== state.currentProspectId);
+  }
+
   document.querySelectorAll(".sidebar__link[data-view]").forEach(l => l.classList.remove("sidebar__link--active"));
   document.querySelector(".sidebar__link[data-view='customers']").classList.add("sidebar__link--active");
   document.getElementById("view-prospect-detail").style.display = "none";
