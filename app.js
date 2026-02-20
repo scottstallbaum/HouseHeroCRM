@@ -925,7 +925,10 @@ async function dbSaveSchedule(customerId, year, tasks, schedule) {
     { customer_id: customerId, year, tasks, schedule },
     { onConflict: "customer_id,year" }
   );
-  if (error) console.error("Save schedule error:", error);
+  if (error) {
+    console.error("Save schedule error:", error);
+    alert("Schedule could not be saved: " + error.message + "\n\nMake sure the 'schedules' table has been created in Supabase.");
+  }
 }
 
 async function dbLoadAllSchedules(year) {
@@ -941,15 +944,14 @@ async function openScheduleForCustomer(customerId) {
   el.innerHTML = `<div class="empty-state"><p>Loading schedule...</p></div>`;
   document.getElementById("schedule-year").textContent = SCHEDULE_YEAR;
 
-  if (!state.schedules[customerId]) {
-    const row = await dbLoadSchedule(customerId, SCHEDULE_YEAR);
-    if (row) {
-      state.schedules[customerId] = { year: row.year, tasks: row.tasks || [], schedule: row.schedule || {} };
-    } else {
-      const tasks = seedScheduleTasks();
-      state.schedules[customerId] = { year: SCHEDULE_YEAR, tasks, schedule: {} };
-      await dbSaveSchedule(customerId, SCHEDULE_YEAR, tasks, {});
-    }
+  // Always load fresh from DB so data persists across page reloads
+  const row = await dbLoadSchedule(customerId, SCHEDULE_YEAR);
+  if (row) {
+    state.schedules[customerId] = { year: row.year, tasks: row.tasks || [], schedule: row.schedule || {} };
+  } else {
+    const tasks = seedScheduleTasks();
+    state.schedules[customerId] = { year: SCHEDULE_YEAR, tasks, schedule: {} };
+    await dbSaveSchedule(customerId, SCHEDULE_YEAR, tasks, {});
   }
 
   // Reset to view mode
