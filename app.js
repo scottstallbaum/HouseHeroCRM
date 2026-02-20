@@ -497,7 +497,8 @@ document.getElementById("prospect-search-input").addEventListener("input", () =>
 //  Render Prospect List 
 const STAGE_LABELS = {
   new: "New Lead", contacted: "Contacted", "follow-up": "Follow-up",
-  proposal: "Proposal Sent", won: "Won", lost: "Lost",
+  consultation: "In-Home Consultation Complete",
+  proposal: "Proposed Schedule Sent", won: "Won", lost: "Lost",
 };
 
 function renderProspectList() {
