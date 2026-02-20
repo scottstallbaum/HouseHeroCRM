@@ -41,6 +41,12 @@ function getCustomer(id) {
   return state.customers.find(c => c.id === id);
 }
 
+function getFullAddress(c) {
+  const parts = [c.street, c.city, c.state ? c.state.toUpperCase() : null, c.zip].filter(Boolean);
+  if (parts.length) return parts.join(", ");
+  return c.address || ""; // backward compat for old single-field records
+}
+
 // ── Elements ───────────────────────────────────────────────
 const viewCustomers    = document.getElementById("view-customers");
 const viewDetail       = document.getElementById("view-detail");
@@ -62,10 +68,17 @@ renderCustomerList();
 function renderCustomerList(filter = "") {
   const q = filter.toLowerCase();
   const filtered = state.customers.filter(c => {
+    const secName = c.secondary?.firstName
+      ? `${c.secondary.firstName} ${c.secondary.lastName}`.toLowerCase()
+      : "";
     return (
       `${c.firstName} ${c.lastName}`.toLowerCase().includes(q) ||
-      (c.address || "").toLowerCase().includes(q) ||
-      (c.phone || "").toLowerCase().includes(q)
+      secName.includes(q) ||
+      getFullAddress(c).toLowerCase().includes(q) ||
+      (c.phone || "").toLowerCase().includes(q) ||
+      (c.secondary?.phone || "").toLowerCase().includes(q) ||
+      (c.email || "").toLowerCase().includes(q) ||
+      (c.secondary?.email || "").toLowerCase().includes(q)
     );
   });
 
@@ -79,11 +92,12 @@ function renderCustomerList(filter = "") {
   customerList.innerHTML = filtered.map(c => `
     <div class="customer-card" data-id="${c.id}">
       <div>
-        <div class="customer-card__name">${escapeHtml(c.firstName)} ${escapeHtml(c.lastName)}</div>
+        <div class="customer-card__name">${escapeHtml(c.firstName)} ${escapeHtml(c.lastName)}${c.secondary?.firstName ? ` <span class="customer-card__secondary">&amp; ${escapeHtml(c.secondary.firstName)} ${escapeHtml(c.secondary.lastName)} <span class="customer-card__rel">(${escapeHtml(c.secondary.relationship || "secondary")})</span></span>` : ""}</div>
         <div class="customer-card__meta">
-          ${c.address ? `<span>📍 ${escapeHtml(c.address)}</span>` : ""}
+          ${getFullAddress(c) ? `<span>📍 ${escapeHtml(getFullAddress(c))}</span>` : ""}
           ${c.phone ? `<span>📞 ${escapeHtml(c.phone)}</span>` : ""}
           ${c.email ? `<span>✉️ ${escapeHtml(c.email)}</span>` : ""}
+          ${c.startDate ? `<span>📅 Since ${formatDate(c.startDate)}</span>` : ""}
         </div>
       </div>
       <div>
@@ -106,7 +120,10 @@ function openCustomer(id) {
   if (!c) return;
 
   document.getElementById("detail-name").textContent = `${c.firstName} ${c.lastName}`;
-  document.getElementById("detail-address").textContent = c.address || "";
+  const secondaryLine = c.secondary?.firstName
+    ? ` & ${c.secondary.firstName} ${c.secondary.lastName}${c.secondary.relationship ? ` (${c.secondary.relationship})` : ""}`
+    : "";
+  document.getElementById("detail-address").textContent = getFullAddress(c) + (secondaryLine ? " · " + secondaryLine : "");
   document.getElementById("detail-plan").value = c.plan || "";
   document.getElementById("detail-start-date").value = c.startDate || "";
   document.getElementById("detail-minutes").value = c.minutesLimit || 75;
@@ -300,9 +317,18 @@ btnAddCustomer.addEventListener("click", () => {
   document.getElementById("modal-customer-title").textContent = "Add Customer";
   document.getElementById("cust-first").value = "";
   document.getElementById("cust-last").value = "";
-  document.getElementById("cust-address").value = "";
+  document.getElementById("cust-street").value = "";
+  document.getElementById("cust-city").value = "";
+  document.getElementById("cust-state").value = "";
+  document.getElementById("cust-zip").value = "";
   document.getElementById("cust-email").value = "";
   document.getElementById("cust-phone").value = "";
+  document.getElementById("cust-start-date").value = "";
+  document.getElementById("cust-second-first").value = "";
+  document.getElementById("cust-second-last").value = "";
+  document.getElementById("cust-second-rel").value = "";
+  document.getElementById("cust-second-phone").value = "";
+  document.getElementById("cust-second-email").value = "";
   openModal("modal-customer");
 });
 
@@ -313,9 +339,18 @@ btnEditCustomer.addEventListener("click", () => {
   document.getElementById("modal-customer-title").textContent = "Edit Customer";
   document.getElementById("cust-first").value = c.firstName || "";
   document.getElementById("cust-last").value = c.lastName || "";
-  document.getElementById("cust-address").value = c.address || "";
+  document.getElementById("cust-street").value = c.street || "";
+  document.getElementById("cust-city").value = c.city || "";
+  document.getElementById("cust-state").value = c.state || "";
+  document.getElementById("cust-zip").value = c.zip || "";
   document.getElementById("cust-email").value = c.email || "";
   document.getElementById("cust-phone").value = c.phone || "";
+  document.getElementById("cust-start-date").value = c.startDate || "";
+  document.getElementById("cust-second-first").value = c.secondary?.firstName || "";
+  document.getElementById("cust-second-last").value = c.secondary?.lastName || "";
+  document.getElementById("cust-second-rel").value = c.secondary?.relationship || "";
+  document.getElementById("cust-second-phone").value = c.secondary?.phone || "";
+  document.getElementById("cust-second-email").value = c.secondary?.email || "";
   openModal("modal-customer");
 });
 
@@ -324,10 +359,25 @@ document.getElementById("form-customer").addEventListener("submit", e => {
   const data = {
     firstName: document.getElementById("cust-first").value.trim(),
     lastName: document.getElementById("cust-last").value.trim(),
-    address: document.getElementById("cust-address").value.trim(),
+    street: document.getElementById("cust-street").value.trim(),
+    city: document.getElementById("cust-city").value.trim(),
+    state: document.getElementById("cust-state").value.trim().toUpperCase(),
+    zip: document.getElementById("cust-zip").value.trim(),
     email: document.getElementById("cust-email").value.trim(),
     phone: document.getElementById("cust-phone").value.trim(),
+    startDate: document.getElementById("cust-start-date").value,
+    secondary: {
+      firstName: document.getElementById("cust-second-first").value.trim(),
+      lastName: document.getElementById("cust-second-last").value.trim(),
+      relationship: document.getElementById("cust-second-rel").value,
+      phone: document.getElementById("cust-second-phone").value.trim(),
+      email: document.getElementById("cust-second-email").value.trim(),
+    },
   };
+  // Clear secondary if no name entered
+  if (!data.secondary.firstName && !data.secondary.lastName) {
+    data.secondary = null;
+  }
 
   if (state.editingCustomerId) {
     const idx = state.customers.findIndex(c => c.id === state.editingCustomerId);
@@ -335,7 +385,7 @@ document.getElementById("form-customer").addEventListener("submit", e => {
       state.customers[idx] = { ...state.customers[idx], ...data };
       // Update detail view header
       document.getElementById("detail-name").textContent = `${data.firstName} ${data.lastName}`;
-      document.getElementById("detail-address").textContent = data.address;
+      document.getElementById("detail-address").textContent = getFullAddress(data);
     }
   } else {
     state.customers.push({

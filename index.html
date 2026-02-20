@@ -24,6 +24,9 @@
       <a href="#" class="sidebar__link sidebar__link--active" data-view="customers">
         <span class="sidebar__icon">👥</span> Customers
       </a>
+      <a href="#" class="sidebar__link" data-view="prospects">
+        <span class="sidebar__icon">🎯</span> Prospects
+      </a>
       <a href="https://scottstallbaum.github.io/HouseHeroSchedulerv1/" class="sidebar__link" target="_blank">
         <span class="sidebar__icon">📅</span> Scheduler ↗
       </a>
@@ -129,6 +132,113 @@
       </div>
     </div>
 
+    <!-- Prospect List View -->
+    <div id="view-prospects" class="view" style="display:none;">
+      <div class="view__header">
+        <div>
+          <h1 class="view__title">Prospects</h1>
+          <p class="view__subtitle" id="prospect-count">Loading...</p>
+        </div>
+        <button id="btn-add-prospect" type="button">+ Add Prospect</button>
+      </div>
+
+      <div class="pipeline-tabs" id="pipeline-tabs">
+        <button class="pipeline-tab pipeline-tab--active" data-stage="all" type="button">All</button>
+        <button class="pipeline-tab" data-stage="new" type="button">New Lead</button>
+        <button class="pipeline-tab" data-stage="contacted" type="button">Contacted</button>
+        <button class="pipeline-tab" data-stage="follow-up" type="button">Follow-up</button>
+        <button class="pipeline-tab" data-stage="proposal" type="button">Proposal Sent</button>
+        <button class="pipeline-tab" data-stage="won" type="button">Won</button>
+        <button class="pipeline-tab" data-stage="lost" type="button">Lost</button>
+      </div>
+
+      <div class="search-bar">
+        <input id="prospect-search-input" type="text" placeholder="Search by name or address..." />
+      </div>
+
+      <div id="prospect-list" class="customer-list">
+        <!-- populated by JS -->
+      </div>
+    </div>
+
+    <!-- Prospect Detail View -->
+    <div id="view-prospect-detail" class="view" style="display:none;">
+      <div class="view__header">
+        <div>
+          <button id="btn-back-prospect" class="ghost btn-back" type="button">← Back to prospects</button>
+          <h1 class="view__title" id="prospect-detail-name">Prospect Name</h1>
+          <p class="view__subtitle" id="prospect-detail-address"></p>
+        </div>
+        <div class="detail-actions">
+          <button id="btn-convert-prospect" type="button" class="convert-btn">✅ Convert to Customer</button>
+          <button id="btn-edit-prospect" type="button" class="ghost">Edit</button>
+          <button id="btn-delete-prospect" type="button" class="ghost danger">Delete</button>
+        </div>
+      </div>
+
+      <div class="detail-grid">
+
+        <!-- Pipeline Stage -->
+        <section class="card">
+          <div class="card__header">
+            <h2>Pipeline Status</h2>
+          </div>
+          <div class="service-grid">
+            <label>
+              Stage
+              <select id="prospect-stage">
+                <option value="new">New Lead</option>
+                <option value="contacted">Contacted</option>
+                <option value="follow-up">Follow-up</option>
+                <option value="proposal">Proposal Sent</option>
+                <option value="won">Won</option>
+                <option value="lost">Lost</option>
+              </select>
+            </label>
+            <label>
+              Lead Source
+              <select id="prospect-source">
+                <option value="">-- Select source --</option>
+                <option value="inbound">Inbound (called us)</option>
+                <option value="referral">Referral</option>
+                <option value="outreach">Outreach</option>
+                <option value="social">Social Media</option>
+                <option value="website">Website</option>
+                <option value="other">Other</option>
+              </select>
+            </label>
+            <label>
+              Last Contact Date
+              <input type="date" id="prospect-last-contact" />
+            </label>
+            <label>
+              Follow-up Date
+              <input type="date" id="prospect-followup" />
+            </label>
+          </div>
+          <button id="btn-save-prospect-status" type="button" style="margin-top:1rem;">Save Status</button>
+        </section>
+
+        <!-- Contact Info -->
+        <section class="card">
+          <div class="card__header">
+            <h2>Contact Info</h2>
+          </div>
+          <div id="prospect-contact-info" class="prospect-contact-info"></div>
+        </section>
+
+        <!-- Notes -->
+        <section class="card card--full">
+          <div class="card__header">
+            <h2>Notes</h2>
+            <button id="btn-add-prospect-note" type="button" class="ghost">+ Add Note</button>
+          </div>
+          <div id="prospect-note-list" class="note-list"></div>
+        </section>
+
+      </div>
+    </div>
+
   </main>
 
   <!-- Modal: Add/Edit Customer -->
@@ -149,8 +259,20 @@
             <input type="text" id="cust-last" required placeholder="Smith" />
           </label>
           <label class="span-2">
-            Address *
-            <input type="text" id="cust-address" required placeholder="123 Maple Drive, Mountain Top, PA 18707" />
+            Street Address
+            <input type="text" id="cust-street" placeholder="123 Maple Drive" />
+          </label>
+          <label>
+            City / Town
+            <input type="text" id="cust-city" placeholder="Mountain Top" />
+          </label>
+          <label>
+            State
+            <input type="text" id="cust-state" placeholder="PA" maxlength="2" style="text-transform:uppercase;" />
+          </label>
+          <label>
+            Zip Code
+            <input type="text" id="cust-zip" placeholder="18707" maxlength="10" />
           </label>
           <label>
             Email
@@ -159,6 +281,43 @@
           <label>
             Phone
             <input type="tel" id="cust-phone" placeholder="(570) 555-1234" />
+          </label>
+          <label>
+            Service Start Date
+            <input type="date" id="cust-start-date" />
+          </label>
+        </div>
+
+        <div class="form-section-divider">
+          <span>Secondary Account Holder <em>(optional)</em></span>
+        </div>
+        <div class="form-grid">
+          <label>
+            First Name
+            <input type="text" id="cust-second-first" placeholder="Mary" />
+          </label>
+          <label>
+            Last Name
+            <input type="text" id="cust-second-last" placeholder="Smith" />
+          </label>
+          <label>
+            Relationship
+            <select id="cust-second-rel">
+              <option value="">-- Select --</option>
+              <option value="spouse">Spouse</option>
+              <option value="parent">Parent</option>
+              <option value="child">Child</option>
+              <option value="roommate">Roommate</option>
+              <option value="landlord">Landlord</option>
+            </select>
+          </label>
+          <label>
+            Phone
+            <input type="tel" id="cust-second-phone" placeholder="(570) 555-5678" />
+          </label>
+          <label class="span-2">
+            Email
+            <input type="email" id="cust-second-email" placeholder="mary@email.com" />
           </label>
         </div>
         <div class="modal__actions">
@@ -230,6 +389,107 @@
         <div class="modal__actions">
           <button type="submit">Save Note</button>
           <button type="button" class="ghost" data-close="modal-note">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Add/Edit Prospect -->
+  <div id="modal-prospect" class="modal" style="display:none;">
+    <div class="modal__box">
+      <div class="modal__header">
+        <h2 id="modal-prospect-title">Add Prospect</h2>
+        <button class="modal__close" data-close="modal-prospect" type="button">✕</button>
+      </div>
+      <form id="form-prospect">
+        <div class="form-grid">
+          <label>
+            First Name *
+            <input type="text" id="prospect-first" required placeholder="Jane" />
+          </label>
+          <label>
+            Last Name *
+            <input type="text" id="prospect-last" required placeholder="Doe" />
+          </label>
+          <label class="span-2">
+            Street Address
+            <input type="text" id="prospect-street" placeholder="123 Maple Drive" />
+          </label>
+          <label>
+            City / Town
+            <input type="text" id="prospect-city" placeholder="Mountain Top" />
+          </label>
+          <label>
+            State
+            <input type="text" id="prospect-state" placeholder="PA" maxlength="2" style="text-transform:uppercase;" />
+          </label>
+          <label>
+            Zip Code
+            <input type="text" id="prospect-zip" placeholder="18707" maxlength="10" />
+          </label>
+          <label>
+            Email
+            <input type="email" id="prospect-email" placeholder="jane@email.com" />
+          </label>
+          <label>
+            Phone
+            <input type="tel" id="prospect-phone" placeholder="(570) 555-1234" />
+          </label>
+          <label>
+            Pipeline Stage
+            <select id="prospect-form-stage">
+              <option value="new">New Lead</option>
+              <option value="contacted">Contacted</option>
+              <option value="follow-up">Follow-up</option>
+              <option value="proposal">Proposal Sent</option>
+              <option value="won">Won</option>
+              <option value="lost">Lost</option>
+            </select>
+          </label>
+          <label>
+            Lead Source
+            <select id="prospect-form-source">
+              <option value="">-- Select source --</option>
+              <option value="inbound">Inbound (called us)</option>
+              <option value="referral">Referral</option>
+              <option value="outreach">Outreach</option>
+              <option value="social">Social Media</option>
+              <option value="website">Website</option>
+              <option value="other">Other</option>
+            </select>
+          </label>
+          <label>
+            Last Contact Date
+            <input type="date" id="prospect-form-last-contact" />
+          </label>
+          <label>
+            Follow-up Date
+            <input type="date" id="prospect-form-followup" />
+          </label>
+        </div>
+        <div class="modal__actions">
+          <button type="submit">Save Prospect</button>
+          <button type="button" class="ghost" data-close="modal-prospect">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Add Prospect Note -->
+  <div id="modal-prospect-note" class="modal" style="display:none;">
+    <div class="modal__box modal__box--narrow">
+      <div class="modal__header">
+        <h2>Add Note</h2>
+        <button class="modal__close" data-close="modal-prospect-note" type="button">✕</button>
+      </div>
+      <form id="form-prospect-note">
+        <label>
+          Note
+          <textarea id="prospect-note-text" rows="5" placeholder="Enter note here..." required></textarea>
+        </label>
+        <div class="modal__actions">
+          <button type="submit">Save Note</button>
+          <button type="button" class="ghost" data-close="modal-prospect-note">Cancel</button>
         </div>
       </form>
     </div>

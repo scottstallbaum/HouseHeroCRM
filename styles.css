@@ -419,6 +419,8 @@ textarea {
   width: 100%;
   max-width: 560px;
   box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+  max-height: 90vh;
+  overflow-y: auto;
 }
 
 .modal__box--narrow {
@@ -456,6 +458,43 @@ textarea {
 }
 
 /* ── Empty state ─────────────────────────────── */
+.customer-card__secondary {
+  font-family: "Space Mono", monospace;
+  font-size: 0.78rem;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.customer-card__rel {
+  font-style: italic;
+}
+
+.form-section-divider {
+  margin: 0.5rem 0 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.form-section-divider::before,
+.form-section-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--stroke);
+}
+
+.form-section-divider em {
+  font-style: italic;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+
 .empty-state {
   text-align: center;
   padding: 3rem 1rem;
