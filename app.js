@@ -174,11 +174,11 @@ function renderContacts(c) {
   const contacts = c.contacts || [];
 
   if (contacts.length === 0) {
-    list.innerHTML = `<div class="empty-state"><p>No contacts yet.</p></div>`;
+    list.innerHTML = "";
     return;
   }
 
-  list.innerHTML = contacts.map(ct => `
+  list.innerHTML = `<div class="additional-contacts-label">Additional Contacts</div>` + contacts.map(ct => `
     <div class="contact-item">
       <div>
         <div class="contact-item__name">${escapeHtml(ct.firstName)} ${escapeHtml(ct.lastName)}${ct.role ? ` <span style="font-weight:400;font-size:0.82rem;color:var(--muted);">— ${escapeHtml(ct.role)}</span>` : ""}</div>

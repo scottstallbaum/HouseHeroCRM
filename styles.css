@@ -653,3 +653,16 @@ textarea {
   font-size: 0.78rem;
   padding: 0.2rem 0.6rem;
 }
+
+/*  Additional contacts label (inside Account Holders card) */
+.additional-contacts-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  font-weight: 700;
+  margin-top: 1.2rem;
+  margin-bottom: 0.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--stroke);
+}
