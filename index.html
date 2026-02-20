@@ -27,8 +27,8 @@
       <a href="#" class="sidebar__link" data-view="prospects">
         <span class="sidebar__icon">🎯</span> Prospects
       </a>
-      <a href="https://scottstallbaum.github.io/HouseHeroSchedulerv1/" class="sidebar__link" target="_blank">
-        <span class="sidebar__icon">📅</span> Scheduler ↗
+      <a href="#" class="sidebar__link" data-view="schedule">
+        <span class="sidebar__icon">📅</span> Schedule
       </a>
     </nav>
     <div class="sidebar__footer">
@@ -128,6 +128,58 @@
             </label>
           </div>
           <button id="btn-save-service" type="button" style="margin-top:1rem;">Save Service Details</button>
+        </section>
+
+        <!-- Annual Schedule -->
+        <section class="card card--full" id="schedule-section">
+          <div class="card__header">
+            <div>
+              <h2 style="margin:0;">Annual Schedule <span id="schedule-year" style="color:var(--muted);font-size:1rem;font-family:'Space Mono',monospace;"></span></h2>
+            </div>
+            <button id="btn-toggle-task-library" type="button" class="ghost ghost--small">Edit Task Library</button>
+          </div>
+          <div id="schedule-card-body" style="margin-top:1rem;">
+            <div class="empty-state"><p>Loading schedule...</p></div>
+          </div>
+          <div id="task-library-panel" style="display:none;">
+            <div style="margin-top:1.5rem;border-top:1px solid var(--stroke);padding-top:1.5rem;">
+              <h3 style="margin:0 0 1rem;font-family:'Fraunces',serif;">Task Library</h3>
+              <form id="form-schedule-task" class="task-lib-form-add">
+                <label style="flex:1 1 200px;">
+                  Task name
+                  <input id="sched-task-name" type="text" placeholder="e.g. Pool Filter Clean" required />
+                </label>
+                <label style="flex:0 0 80px;">
+                  Minutes
+                  <input id="sched-task-minutes" type="number" min="1" max="180" placeholder="15" required />
+                </label>
+                <label style="flex:0 0 180px;">
+                  Category
+                  <select id="sched-task-category">
+                    <option value="Appliance Maintenance">Appliance Maintenance</option>
+                    <option value="Auto Maintenance">Auto Maintenance</option>
+                    <option value="Energy Efficiency">Energy Efficiency</option>
+                    <option value="Home Safety">Home Safety</option>
+                    <option value="HVAC">HVAC</option>
+                    <option value="Seasonal">Seasonal</option>
+                    <option value="Plumbing">Plumbing</option>
+                  </select>
+                </label>
+                <label style="flex:0 0 140px;">
+                  Frequency
+                  <select id="sched-task-frequency">
+                    <option value="every">Every visit</option>
+                    <option value="annual">Annual</option>
+                    <option value="adhoc">Ad hoc</option>
+                  </select>
+                </label>
+                <div style="display:flex;align-items:flex-end;padding-bottom:2px;">
+                  <button type="submit">+ Add Task</button>
+                </div>
+              </form>
+              <div id="schedule-task-table"></div>
+            </div>
+          </div>
         </section>
 
       </div>
@@ -239,6 +291,27 @@
           <div id="prospect-note-list" class="note-list"></div>
         </section>
 
+      </div>
+    </div>
+
+    <!-- Master Schedule View -->
+    <div id="view-schedule" class="view" style="display:none;">
+      <div class="view__header">
+        <div>
+          <h1 class="view__title">Schedule</h1>
+          <p class="view__subtitle" id="schedule-master-subtitle">Annual Service Calendar</p>
+        </div>
+      </div>
+      <div class="pipeline-tabs" id="master-period-tabs">
+        <button class="pipeline-tab pipeline-tab--active" data-period="Jan - Feb" type="button">Jan – Feb</button>
+        <button class="pipeline-tab" data-period="Mar - Apr" type="button">Mar – Apr</button>
+        <button class="pipeline-tab" data-period="May - Jun" type="button">May – Jun</button>
+        <button class="pipeline-tab" data-period="Jul - Aug" type="button">Jul – Aug</button>
+        <button class="pipeline-tab" data-period="Sep - Oct" type="button">Sep – Oct</button>
+        <button class="pipeline-tab" data-period="Nov - Dec" type="button">Nov – Dec</button>
+      </div>
+      <div id="master-schedule-list" style="margin-top:1.25rem;">
+        <div class="empty-state"><p>Loading...</p></div>
       </div>
     </div>
 

@@ -666,3 +666,186 @@ textarea {
   padding-top: 1rem;
   border-top: 1px solid var(--stroke);
 }
+
+/* ── Schedule Table ───────────────────────────────────────── */
+.schedule-table-wrap {
+  overflow-x: auto;
+  margin: 0 -0.25rem;
+}
+
+.schedule-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: "Space Mono", "Courier New", monospace;
+  font-size: 0.78rem;
+}
+
+.schedule-table thead th {
+  text-align: left;
+  padding: 0.6rem 0.75rem;
+  background: var(--accent-light);
+  border-bottom: 2px solid var(--stroke);
+  white-space: nowrap;
+  font-size: 0.78rem;
+}
+
+.schedule-table tbody th.category-cell {
+  text-align: left;
+  padding: 0.6rem 0.75rem;
+  background: #fdf0e4;
+  border-right: 1px solid var(--stroke);
+  border-bottom: 1px solid var(--stroke);
+  font-family: "Fraunces", Georgia, serif;
+  font-size: 0.82rem;
+  white-space: nowrap;
+  vertical-align: top;
+}
+
+.schedule-table td {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--stroke);
+  vertical-align: top;
+  background: var(--panel);
+  min-width: 130px;
+}
+
+.schedule-choice {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.4rem;
+  align-items: center;
+  padding: 0.2rem 0;
+  cursor: pointer;
+}
+
+.schedule-choice input[type="checkbox"] {
+  accent-color: var(--accent);
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+  padding: 0;
+  border-radius: 3px;
+}
+
+.schedule-choice__name {
+  line-height: 1.3;
+}
+
+.schedule-choice__time {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  text-align: right;
+  min-width: 2.8rem;
+}
+
+.schedule-total-row th,
+.schedule-total-row td {
+  background: #ffeab5;
+  font-weight: 700;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--stroke);
+}
+
+.schedule-total--over {
+  color: #6d1a0a;
+  font-weight: 700;
+}
+
+/* ── Task Library Panel ───────────────────────────────────── */
+.task-lib-form-add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: flex-end;
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background: var(--accent-light);
+  border-radius: 10px;
+}
+
+.task-lib-group {
+  margin-bottom: 1.25rem;
+}
+
+.task-lib-category-label {
+  font-family: "Fraunces", Georgia, serif;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 0.35rem;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid var(--stroke);
+}
+
+.task-lib-row {
+  display: grid;
+  grid-template-columns: 1fr 60px auto 130px auto;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.3rem 0;
+}
+
+.task-lib-min-label {
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin-left: -0.25rem;
+}
+
+/* ── Master Schedule View ─────────────────────────────────── */
+.master-sched-card {
+  background: var(--card);
+  border: 1px solid var(--stroke);
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.master-sched-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.6rem;
+}
+
+.master-sched-name {
+  font-family: "Fraunces", Georgia, serif;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.master-sched-total {
+  font-size: 0.8rem;
+  color: var(--muted);
+  background: var(--accent-light);
+  border-radius: 999px;
+  padding: 0.2rem 0.7rem;
+}
+
+.master-sched-total.schedule-total--over {
+  background: #fbd0c0;
+}
+
+.master-sched-tasks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.master-sched-tasks li {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: white;
+  border: 1px solid var(--stroke);
+  border-radius: 999px;
+  padding: 0.2rem 0.65rem;
+  font-size: 0.75rem;
+}
+
+.master-sched-tasks .task-min {
+  color: var(--muted);
+}
+

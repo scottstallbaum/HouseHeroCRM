@@ -15,6 +15,7 @@ const state = {
   currentProspectId: null,
   editingProspectId: null,
   activePipelineStage: "all",
+  schedules: {},
 };
 
 // ── DB Mappers ─────────────────────────────────────────────
@@ -258,6 +259,7 @@ function openCustomer(id) {
   renderAccountHolders(c);
   renderContacts(c);
   renderNotes(c);
+  openScheduleForCustomer(id);
 
   viewCustomers.style.display = "none";
   viewDetail.style.display = "block";
@@ -587,12 +589,16 @@ document.querySelectorAll(".sidebar__link[data-view]").forEach(link => {
     viewDetail.style.display = "none";
     document.getElementById("view-prospects").style.display = "none";
     document.getElementById("view-prospect-detail").style.display = "none";
+    document.getElementById("view-schedule").style.display = "none";
     if (view === "customers") {
       viewCustomers.style.display = "block";
       renderCustomerList(searchInput.value);
     } else if (view === "prospects") {
       document.getElementById("view-prospects").style.display = "block";
       renderProspectList();
+    } else if (view === "schedule") {
+      document.getElementById("view-schedule").style.display = "block";
+      openMasterScheduleView();
     }
   });
 });
@@ -869,3 +875,316 @@ document.getElementById("btn-convert-prospect").addEventListener("click", async 
   renderCustomerList();
   alert(`${p.firstName} ${p.lastName} has been added as an active customer!`);
 });
+
+// ── Schedule Constants ─────────────────────────────────────
+const SCHEDULE_PERIODS = ["Jan - Feb", "Mar - Apr", "May - Jun", "Jul - Aug", "Sep - Oct", "Nov - Dec"];
+const SCHEDULE_CATEGORIES = [
+  "Appliance Maintenance", "Auto Maintenance", "Energy Efficiency",
+  "Home Safety", "HVAC", "Seasonal", "Plumbing",
+];
+const SCHEDULE_YEAR = new Date().getFullYear();
+
+function seedScheduleTasks() {
+  return [
+    { id: generateId(), name: "Refrigerator Filter", minutes: 5, category: "Appliance Maintenance", frequency: "every" },
+    { id: generateId(), name: "Dishwasher Cleaning", minutes: 12, category: "Appliance Maintenance", frequency: "annual" },
+    { id: generateId(), name: "Stove Exhaust Filter Replacement", minutes: 15, category: "Appliance Maintenance", frequency: "annual" },
+    { id: generateId(), name: "Dryer Vent Cleaning", minutes: 20, category: "Appliance Maintenance", frequency: "annual" },
+    { id: generateId(), name: "Car Maintenance (Filters/Wipers/Air)", minutes: 30, category: "Auto Maintenance", frequency: "annual" },
+    { id: generateId(), name: "Exterior Door/Window Maintenance", minutes: 25, category: "Energy Efficiency", frequency: "annual" },
+    { id: generateId(), name: "Thermal Imaging for Heat Loss", minutes: 15, category: "Energy Efficiency", frequency: "annual" },
+    { id: generateId(), name: "Light Bulbs/Fan Switch", minutes: 8, category: "Energy Efficiency", frequency: "every" },
+    { id: generateId(), name: "Thermal Imaging for AC Loss", minutes: 12, category: "Energy Efficiency", frequency: "annual" },
+    { id: generateId(), name: "Garage Door Tune Up", minutes: 30, category: "Home Safety", frequency: "annual" },
+    { id: generateId(), name: "Smoke-CO Detector Batteries", minutes: 5, category: "Home Safety", frequency: "every" },
+    { id: generateId(), name: "Attic/Basement/Crawl Inspection", minutes: 15, category: "Home Safety", frequency: "annual" },
+    { id: generateId(), name: "Camera/Doorbell Inspection", minutes: 5, category: "Home Safety", frequency: "annual" },
+    { id: generateId(), name: "Basic Gutter/Downspout Clearing", minutes: 25, category: "Home Safety", frequency: "annual" },
+    { id: generateId(), name: "Air Filter Furnace", minutes: 5, category: "HVAC", frequency: "every" },
+    { id: generateId(), name: "AC Unit Check", minutes: 8, category: "HVAC", frequency: "annual" },
+    { id: generateId(), name: "Fall Prep", minutes: 40, category: "Seasonal", frequency: "annual" },
+    { id: generateId(), name: "Spring Prep", minutes: 20, category: "Seasonal", frequency: "annual" },
+    { id: generateId(), name: "Water Softener Salt Delivery/Refill", minutes: 8, category: "Plumbing", frequency: "every" },
+    { id: generateId(), name: "Whole House Water Filter Replacement", minutes: 10, category: "Plumbing", frequency: "annual" },
+    { id: generateId(), name: "Hot Water Heater Drain/Flush", minutes: 45, category: "Plumbing", frequency: "annual" },
+    { id: generateId(), name: "Shower/Tub/Faucet Descaling", minutes: 20, category: "Plumbing", frequency: "annual" },
+  ];
+}
+
+// ── Schedule DB Operations ─────────────────────────────────
+async function dbLoadSchedule(customerId, year) {
+  const { data, error } = await sb.from("schedules")
+    .select("*").eq("customer_id", customerId).eq("year", year).maybeSingle();
+  if (error) { console.error("Load schedule error:", error); return null; }
+  return data;
+}
+
+async function dbSaveSchedule(customerId, year, tasks, schedule) {
+  const { error } = await sb.from("schedules").upsert(
+    { customer_id: customerId, year, tasks, schedule },
+    { onConflict: "customer_id,year" }
+  );
+  if (error) console.error("Save schedule error:", error);
+}
+
+async function dbLoadAllSchedules(year) {
+  const { data, error } = await sb.from("schedules").select("*").eq("year", year);
+  if (error) { console.error("Load all schedules error:", error); return []; }
+  return data || [];
+}
+
+// ── Open Schedule for Customer ─────────────────────────────
+async function openScheduleForCustomer(customerId) {
+  const el = document.getElementById("schedule-card-body");
+  if (!el) return;
+  el.innerHTML = `<div class="empty-state"><p>Loading schedule...</p></div>`;
+  document.getElementById("schedule-year").textContent = SCHEDULE_YEAR;
+
+  if (!state.schedules[customerId]) {
+    const row = await dbLoadSchedule(customerId, SCHEDULE_YEAR);
+    if (row) {
+      state.schedules[customerId] = { year: row.year, tasks: row.tasks || [], schedule: row.schedule || {} };
+    } else {
+      const tasks = seedScheduleTasks();
+      state.schedules[customerId] = { year: SCHEDULE_YEAR, tasks, schedule: {} };
+      await dbSaveSchedule(customerId, SCHEDULE_YEAR, tasks, {});
+    }
+  }
+
+  // Reset task library panel
+  const panel = document.getElementById("task-library-panel");
+  if (panel) panel.style.display = "none";
+  const libBtn = document.getElementById("btn-toggle-task-library");
+  if (libBtn) libBtn.textContent = "Edit Task Library";
+
+  renderScheduleCard(customerId);
+  renderScheduleTaskLibrary(customerId);
+}
+
+// ── Render Schedule Table ──────────────────────────────────
+function renderScheduleCard(customerId) {
+  const sched = state.schedules[customerId];
+  const el = document.getElementById("schedule-card-body");
+  if (!el || !sched) return;
+  const c = getCustomer(customerId);
+  const limitMinutes = c?.minutesLimit || 75;
+
+  el.innerHTML = buildScheduleTableHTML(sched.tasks, sched.schedule, limitMinutes);
+
+  el.querySelectorAll("input[data-action='toggle-task']").forEach(cb => {
+    cb.addEventListener("change", async () => {
+      const period = cb.dataset.period;
+      const taskId = cb.dataset.id;
+      const ids = Array.isArray(sched.schedule[period]) ? [...sched.schedule[period]] : [];
+      if (cb.checked && !ids.includes(taskId)) {
+        ids.push(taskId);
+      } else if (!cb.checked) {
+        const idx = ids.indexOf(taskId);
+        if (idx !== -1) ids.splice(idx, 1);
+      }
+      sched.schedule[period] = ids;
+      await dbSaveSchedule(customerId, sched.year, sched.tasks, sched.schedule);
+      updateScheduleTotals(customerId);
+    });
+  });
+}
+
+function updateScheduleTotals(customerId) {
+  const sched = state.schedules[customerId];
+  const c = getCustomer(customerId);
+  const limitMinutes = c?.minutesLimit || 75;
+  if (!sched) return;
+  SCHEDULE_PERIODS.forEach(period => {
+    const ids = Array.isArray(sched.schedule[period]) ? sched.schedule[period] : [];
+    const total = ids.reduce((sum, id) => {
+      const task = sched.tasks.find(t => t.id === id);
+      return sum + (task?.minutes || 0);
+    }, 0);
+    const span = document.querySelector(`[data-total-period="${period}"]`);
+    if (span) {
+      span.textContent = `${total} / ${limitMinutes}m`;
+      span.className = total > limitMinutes ? "schedule-total--over" : "";
+    }
+  });
+}
+
+function buildScheduleTableHTML(tasks, schedule, limitMinutes) {
+  const headerCols = SCHEDULE_PERIODS.map(p => `<th>${escapeHtml(p)}</th>`).join("");
+
+  const bodyRows = SCHEDULE_CATEGORIES.map(category => {
+    const catTasks = tasks.filter(t => t.category === category);
+    if (catTasks.length === 0) return "";
+    const cells = SCHEDULE_PERIODS.map(period => {
+      const ids = Array.isArray(schedule[period]) ? schedule[period] : [];
+      const items = catTasks.map(task => {
+        const checked = ids.includes(task.id) ? "checked" : "";
+        return `<label class="schedule-choice">
+          <input type="checkbox" data-action="toggle-task" data-period="${escapeHtml(period)}" data-id="${task.id}" ${checked} />
+          <span class="schedule-choice__name">${escapeHtml(task.name)}</span>
+          <span class="schedule-choice__time">${task.minutes}m</span>
+        </label>`;
+      }).join("");
+      return `<td>${items}</td>`;
+    }).join("");
+    return `<tr><th class="category-cell">${escapeHtml(category)}</th>${cells}</tr>`;
+  }).join("");
+
+  const totalsRow = `<tr class="schedule-total-row"><th>Total minutes</th>${
+    SCHEDULE_PERIODS.map(period => {
+      const ids = Array.isArray(schedule[period]) ? schedule[period] : [];
+      const total = ids.reduce((sum, id) => {
+        const task = tasks.find(t => t.id === id);
+        return sum + (task?.minutes || 0);
+      }, 0);
+      const overClass = total > limitMinutes ? "schedule-total--over" : "";
+      return `<td><span class="${overClass}" data-total-period="${escapeHtml(period)}">${total} / ${limitMinutes}m</span></td>`;
+    }).join("")
+  }</tr>`;
+
+  return `<div class="schedule-table-wrap"><table class="schedule-table">
+    <thead><tr><th>Category / Task</th>${headerCols}</tr></thead>
+    <tbody>${bodyRows}${totalsRow}</tbody>
+  </table></div>`;
+}
+
+// ── Task Library ───────────────────────────────────────────
+document.getElementById("btn-toggle-task-library").addEventListener("click", () => {
+  const panel = document.getElementById("task-library-panel");
+  const isOpen = panel.style.display !== "none";
+  panel.style.display = isOpen ? "none" : "block";
+  document.getElementById("btn-toggle-task-library").textContent = isOpen ? "Edit Task Library" : "Close Task Library";
+});
+
+function renderScheduleTaskLibrary(customerId) {
+  const sched = state.schedules[customerId];
+  const container = document.getElementById("schedule-task-table");
+  if (!container || !sched) return;
+
+  const html = SCHEDULE_CATEGORIES.map(category => {
+    const catTasks = sched.tasks.filter(t => t.category === category);
+    if (catTasks.length === 0) return "";
+    return `<div class="task-lib-group">
+      <div class="task-lib-category-label">${escapeHtml(category)}</div>
+      ${catTasks.map(task => `
+        <div class="task-lib-row">
+          <input class="task-lib-input" data-field="name" data-id="${task.id}" type="text" value="${escapeHtml(task.name)}" />
+          <input class="task-lib-input" data-field="minutes" data-id="${task.id}" type="number" min="1" value="${task.minutes}" style="width:60px;" />
+          <span class="task-lib-min-label">min</span>
+          <select data-field="frequency" data-id="${task.id}">
+            <option value="every" ${task.frequency === "every" ? "selected" : ""}>Every visit</option>
+            <option value="annual" ${task.frequency === "annual" ? "selected" : ""}>Annual</option>
+            <option value="adhoc" ${task.frequency === "adhoc" ? "selected" : ""}>Ad hoc</option>
+          </select>
+          <button type="button" class="ghost danger icon-btn" data-lib-remove="${task.id}">&#10005;</button>
+        </div>`).join("")}
+    </div>`;
+  }).join("");
+
+  container.innerHTML = html || `<div class="empty-state"><p>No tasks. Add one above.</p></div>`;
+
+  container.querySelectorAll("[data-field]").forEach(input => {
+    input.addEventListener("change", async () => {
+      const task = sched.tasks.find(t => t.id === input.dataset.id);
+      if (!task) return;
+      if (input.dataset.field === "name") task.name = input.value.trim();
+      if (input.dataset.field === "minutes") task.minutes = Number(input.value) || task.minutes;
+      if (input.dataset.field === "frequency") task.frequency = input.value;
+      await dbSaveSchedule(state.currentCustomerId, sched.year, sched.tasks, sched.schedule);
+      renderScheduleCard(state.currentCustomerId);
+    });
+  });
+
+  container.querySelectorAll("[data-lib-remove]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("Remove this task?")) return;
+      const taskId = btn.dataset.libRemove;
+      sched.tasks = sched.tasks.filter(t => t.id !== taskId);
+      SCHEDULE_PERIODS.forEach(p => {
+        if (Array.isArray(sched.schedule[p])) {
+          sched.schedule[p] = sched.schedule[p].filter(id => id !== taskId);
+        }
+      });
+      await dbSaveSchedule(state.currentCustomerId, sched.year, sched.tasks, sched.schedule);
+      renderScheduleCard(state.currentCustomerId);
+      renderScheduleTaskLibrary(state.currentCustomerId);
+    });
+  });
+}
+
+document.getElementById("form-schedule-task").addEventListener("submit", async e => {
+  e.preventDefault();
+  const customerId = state.currentCustomerId;
+  const sched = state.schedules[customerId];
+  if (!sched) return;
+  const name = document.getElementById("sched-task-name").value.trim();
+  const minutes = Number(document.getElementById("sched-task-minutes").value) || 10;
+  const category = document.getElementById("sched-task-category").value;
+  const frequency = document.getElementById("sched-task-frequency").value;
+  sched.tasks.push({ id: generateId(), name, minutes, category, frequency });
+  await dbSaveSchedule(customerId, sched.year, sched.tasks, sched.schedule);
+  renderScheduleCard(customerId);
+  renderScheduleTaskLibrary(customerId);
+  e.target.reset();
+});
+
+// ── Master Schedule View ───────────────────────────────────
+let activeMasterPeriod = SCHEDULE_PERIODS[0];
+
+document.getElementById("master-period-tabs").addEventListener("click", e => {
+  const tab = e.target.closest(".pipeline-tab");
+  if (!tab) return;
+  document.querySelectorAll("#master-period-tabs .pipeline-tab").forEach(t => t.classList.remove("pipeline-tab--active"));
+  tab.classList.add("pipeline-tab--active");
+  activeMasterPeriod = tab.dataset.period;
+  renderMasterSchedule();
+});
+
+async function openMasterScheduleView() {
+  document.getElementById("schedule-master-subtitle").textContent = `${SCHEDULE_YEAR} Annual Service Calendar`;
+  const listEl = document.getElementById("master-schedule-list");
+  listEl.innerHTML = `<div class="empty-state"><p>Loading schedules...</p></div>`;
+  const rows = await dbLoadAllSchedules(SCHEDULE_YEAR);
+  rows.forEach(row => {
+    if (!state.schedules[row.customer_id]) {
+      state.schedules[row.customer_id] = { year: row.year, tasks: row.tasks || [], schedule: row.schedule || {} };
+    }
+  });
+  renderMasterSchedule();
+}
+
+function renderMasterSchedule() {
+  const listEl = document.getElementById("master-schedule-list");
+  const period = activeMasterPeriod;
+
+  const entries = state.customers
+    .map(c => {
+      const sched = state.schedules[c.id];
+      const ids = sched?.schedule?.[period];
+      if (!Array.isArray(ids) || ids.length === 0) return null;
+      const tasks = ids.map(id => sched.tasks.find(t => t.id === id)).filter(Boolean);
+      const total = tasks.reduce((sum, t) => sum + t.minutes, 0);
+      const limit = c.minutesLimit || 75;
+      return { c, tasks, total, limit };
+    })
+    .filter(Boolean);
+
+  if (entries.length === 0) {
+    listEl.innerHTML = `<div class="empty-state"><p>No customers have tasks scheduled for ${escapeHtml(period)}.</p><p>Open a customer record and check tasks to build their schedule.</p></div>`;
+    return;
+  }
+
+  listEl.innerHTML = entries.map(({ c, tasks, total, limit }) => {
+    const overClass = total > limit ? "schedule-total--over" : "";
+    const addr = getFullAddress(c);
+    return `<div class="master-sched-card">
+      <div class="master-sched-header">
+        <span class="master-sched-name">${escapeHtml(c.firstName)} ${escapeHtml(c.lastName)}${addr ? `<span style="font-weight:400;font-size:0.82rem;color:var(--muted);margin-left:0.5rem;">${escapeHtml(addr)}</span>` : ""}</span>
+        <span class="master-sched-total ${overClass}">${total} / ${limit}m</span>
+      </div>
+      <ul class="master-sched-tasks">
+        ${tasks.map(t => `<li><span>${escapeHtml(t.name)}</span><span class="task-min">${t.minutes}m</span></li>`).join("")}
+      </ul>
+    </div>`;
+  }).join("");
+}
+
