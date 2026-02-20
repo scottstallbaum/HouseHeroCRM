@@ -2,7 +2,7 @@
 const { createClient } = window.supabase;
 const sb = createClient(
   "https://qjnzyheszvkfwlgjudgo.supabase.co",
-  "sb_publishable_0y9KuBZHM6Vo82eLWbLKwg_B19lsoIB"
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFqbnp5aGVzenZrZndsZ2p1ZGdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE2MjU5ODYsImV4cCI6MjA4NzIwMTk4Nn0.mHvG_WxpQbNAIpzX-iVa7fBm7wuXfFkVBsig3gLVhQI"
 );
 
 // ── State ──────────────────────────────────────────────────
