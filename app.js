@@ -1133,6 +1133,115 @@ function buildScheduleTableHTML(tasks, schedule, limitMinutes) {
   </table></div>`;
 }
 
+// ── Print Schedule ───────────────────────────────────────
+function printSchedule(customerId) {
+  const sched = state.schedules[customerId];
+  const c = getCustomer(customerId);
+  if (!sched || !c) return;
+  const fullName = [c.firstName, c.lastName].filter(Boolean).join(" ");
+  const address = getFullAddress(c);
+  const { tasks, schedule } = sched;
+
+  const activeCategories = SCHEDULE_CATEGORIES.filter(cat =>
+    tasks.some(t => t.category === cat &&
+      SCHEDULE_PERIODS.some(p => (schedule[p] || []).includes(t.id))
+    )
+  );
+
+  const headerCols = SCHEDULE_PERIODS.map(p =>
+    `<th>${escapeHtml(p)}</th>`
+  ).join("");
+
+  const bodyRows = activeCategories.map(cat => {
+    const catTasks = tasks.filter(t => t.category === cat);
+    const cells = SCHEDULE_PERIODS.map(p => {
+      const ids = Array.isArray(schedule[p]) ? schedule[p] : [];
+      const cellTasks = catTasks.filter(t => ids.includes(t.id));
+      const content = cellTasks.length > 0
+        ? cellTasks.map(t => `<div class="ptask">&#9656; ${escapeHtml(t.name)}</div>`).join("")
+        : "";
+      return `<td>${content}</td>`;
+    }).join("");
+    return `<tr><th>${escapeHtml(cat)}</th>${cells}</tr>`;
+  }).join("");
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Home Maintenance Schedule – ${escapeHtml(fullName)}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Georgia, serif; background: #f5f0eb; color: #2a1a0a; }
+  .page { max-width: 960px; margin: 0 auto; background: #fff; }
+  /* Header */
+  .ph { background: #5c2d0a; color: #fff; display: flex; align-items: center; justify-content: space-between; padding: 1.2rem 2rem; }
+  .ph-logo { font-size: 1.4rem; font-weight: 900; letter-spacing: -0.5px; color: #fff; }
+  .ph-logo span { display: block; font-size: 0.65rem; font-weight: 400; letter-spacing: 2px; text-transform: uppercase; color: #f0c88a; }
+  .ph-title { text-align: center; }
+  .ph-title h1 { font-size: 1.5rem; font-weight: 700; }
+  .ph-title p { font-size: 0.8rem; font-style: italic; color: #f0c88a; margin-top: 0.2rem; }
+  .ph-contact { text-align: right; font-size: 0.75rem; line-height: 1.8; color: #f0c88a; }
+  /* Customer line */
+  .cust-bar { display: flex; gap: 2rem; padding: 0.9rem 2rem; border-bottom: 2px solid #8b4513; background: #fff; }
+  .cust-bar label { font-size: 0.78rem; color: #8b4513; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-right: 0.4rem; }
+  .cust-bar span { font-size: 0.95rem; border-bottom: 1px solid #c8a882; padding-bottom: 2px; min-width: 200px; display: inline-block; }
+  /* Table */
+  .wrap { padding: 1.5rem 2rem; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+  thead th { background: #3d1f08; color: #fff; text-align: center; padding: 0.6rem 0.5rem; font-size: 0.78rem; border: 1px solid #5c2d0a; }
+  thead th:first-child { text-align: left; width: 130px; }
+  tbody th { font-style: italic; font-weight: 700; color: #5c2d0a; text-align: left; padding: 0.5rem 0.5rem; border: 1px solid #d4b896; vertical-align: top; background: #fdf8f2; }
+  tbody td { border: 1px solid #d4b896; padding: 0.4rem 0.6rem; vertical-align: top; min-width: 80px; }
+  .ptask { margin: 2px 0; line-height: 1.4; }
+  /* Footer */
+  .pf { background: #f5f0eb; text-align: center; font-size: 0.72rem; color: #8b4513; padding: 0.7rem 2rem; border-top: 2px solid #c8a882; }
+  /* Print controls */
+  .print-controls { text-align: center; padding: 1.5rem; background: #f5f0eb; }
+  .tip { display: inline-block; background: #fffbe6; border: 1px solid #f0c88a; border-radius: 8px; padding: 0.5rem 1rem; font-size: 0.78rem; margin-bottom: 1rem; }
+  .tip::before { content: '\1F4A1  '; }
+  .btn-print { background: #2e6070; color: #fff; border: none; border-radius: 8px; padding: 0.6rem 1.8rem; font-size: 1rem; cursor: pointer; margin-right: 0.75rem; }
+  .btn-cancel { background: transparent; border: 2px solid #5c2d0a; border-radius: 8px; padding: 0.6rem 1.4rem; font-size: 1rem; cursor: pointer; color: #5c2d0a; }
+  @media print {
+    .print-controls { display: none; }
+    body { background: #fff; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="ph">
+    <div class="ph-logo">House<br>Hero<span>Home Services</span></div>
+    <div class="ph-title"><h1>Home Maintenance Schedule</h1><p>Your Partner for Worry-Free Home Maintenance</p></div>
+    <div class="ph-contact">info@househeropa.com<br>(570) 301-6283<br>househeropa.com</div>
+  </div>
+  <div class="cust-bar">
+    <div><label>Prepared for:</label><span>${escapeHtml(fullName)}</span></div>
+    <div><label>Address:</label><span>${escapeHtml(address)}</span></div>
+  </div>
+  <div class="wrap">
+    <table>
+      <thead><tr><th>Category</th>${headerCols}</tr></thead>
+      <tbody>${bodyRows}</tbody>
+    </table>
+  </div>
+  <div class="pf">House Hero LLC &nbsp;|&nbsp; PA Registered &amp; Insured &nbsp;|&nbsp; (570) 301-6283 &nbsp;|&nbsp; info@househeropa.com</div>
+</div>
+<div class="print-controls">
+  <div class="tip">In the print dialog &rarr; More settings &rarr; uncheck &ldquo;Headers and footers&rdquo;</div><br>
+  <button class="btn-print" onclick="window.print()">Print / Save as PDF</button>
+  <button class="btn-cancel" onclick="window.close()">Cancel</button>
+</div>
+</body></html>`;
+
+  const win = window.open("", "_blank");
+  if (win) { win.document.write(html); win.document.close(); }
+}
+
+document.getElementById("btn-print-schedule").addEventListener("click", () => {
+  printSchedule(state.currentCustomerId);
+});
+
 // ── Schedule view/edit toggle ─────────────────────────────
 document.getElementById("btn-edit-schedule").addEventListener("click", () => {
   state.scheduleEditMode = !state.scheduleEditMode;
