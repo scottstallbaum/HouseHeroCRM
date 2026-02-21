@@ -293,6 +293,8 @@ body {
 .note-list {
   display: grid;
   gap: 0.75rem;
+  max-height: 180px;
+  overflow-y: auto;
 }
 
 .note-item {
