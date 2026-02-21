@@ -818,6 +818,20 @@ textarea {
   min-width: 2.8rem;
 }
 
+.sched-view-task {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  padding: 0.15rem 0;
+  line-height: 1.4;
+}
+
+.sched-view-empty {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
 .schedule-total-row th,
 .schedule-total-row td {
   background: #ffeab5;

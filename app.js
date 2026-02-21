@@ -1036,41 +1036,52 @@ function buildScheduleSummaryHTML(tasks, schedule, limitMinutes) {
     return `<div class="empty-state"><p>No tasks scheduled yet.</p><p>Click <strong>Edit Schedule</strong> to build this customer's annual plan.</p></div>`;
   }
 
-  const cols = SCHEDULE_PERIODS.map(period => {
-    const ids = Array.isArray(schedule[period]) ? schedule[period] : [];
-    const periodTasks = ids.map(id => tasks.find(t => t.id === id)).filter(Boolean);
-    const total = periodTasks.reduce((sum, t) => sum + t.minutes, 0);
-    const isOver = total > limitMinutes;
-    const overColClass = isOver ? " sched-summary-col--over" : "";
-    const overTotalClass = isOver ? " schedule-total--over" : "";
+  // Pre-calculate per-period totals and over-limit status
+  const periodTotals = {};
+  const overSet = new Set();
+  SCHEDULE_PERIODS.forEach(p => {
+    const ids = Array.isArray(schedule[p]) ? schedule[p] : [];
+    const total = ids.reduce((sum, id) => { const t = tasks.find(t => t.id === id); return sum + (t?.minutes || 0); }, 0);
+    periodTotals[p] = total;
+    if (total > limitMinutes) overSet.add(p);
+  });
 
-    // Group by category
-    let taskItems = "";
-    if (periodTasks.length === 0) {
-      taskItems = `<li style="color:var(--muted);font-style:italic;">No tasks</li>`;
-    } else {
-      const grouped = {};
-      periodTasks.forEach(t => {
-        const cat = t.category || "Other";
-        if (!grouped[cat]) grouped[cat] = [];
-        grouped[cat].push(t);
-      });
-      taskItems = SCHEDULE_CATEGORIES
-        .filter(cat => grouped[cat])
-        .map(cat => `
-          <li class="sched-summary-cat-label">${escapeHtml(cat)}</li>
-          ${grouped[cat].map(t => `<li class="sched-summary-task"><span>${escapeHtml(t.name)}</span><span class="task-min">${t.minutes}m</span></li>`).join("")}
-        `).join("");
-    }
+  // Only show categories that have at least one task scheduled in any period
+  const activeCategories = SCHEDULE_CATEGORIES.filter(cat =>
+    tasks.some(t => t.category === cat &&
+      SCHEDULE_PERIODS.some(p => (schedule[p] || []).includes(t.id))
+    )
+  );
 
-    return `<div class="sched-summary-col${overColClass}">
-      <div class="sched-summary-period">${escapeHtml(period)}</div>
-      <ul class="sched-summary-task-list">${taskItems}</ul>
-      ${total > 0 ? `<div class="sched-summary-total${overTotalClass}">${total} / ${limitMinutes}m</div>` : ""}
-    </div>`;
+  const headerCols = SCHEDULE_PERIODS.map(p =>
+    `<th class="${overSet.has(p) ? "sched-summary-col--over" : ""}">${escapeHtml(p)}</th>`
+  ).join("");
+
+  const bodyRows = activeCategories.map(category => {
+    const catTasks = tasks.filter(t => t.category === category);
+    const cells = SCHEDULE_PERIODS.map(period => {
+      const ids = Array.isArray(schedule[period]) ? schedule[period] : [];
+      const cellTasks = catTasks.filter(t => ids.includes(t.id));
+      const overClass = overSet.has(period) ? " sched-summary-col--over" : "";
+      const content = cellTasks.length > 0
+        ? cellTasks.map(t => `<div class="sched-view-task"><span>${escapeHtml(t.name)}</span><span class="task-min">${t.minutes}m</span></div>`).join("")
+        : `<span class="sched-view-empty">—</span>`;
+      return `<td class="${overClass}">${content}</td>`;
+    }).join("");
+    return `<tr><th class="category-cell">${escapeHtml(category)}</th>${cells}</tr>`;
   }).join("");
 
-  return `<div class="sched-summary-grid">${cols}</div>`;
+  const totalsRow = `<tr class="schedule-total-row"><th>Total minutes</th>${
+    SCHEDULE_PERIODS.map(p => {
+      const overClass = overSet.has(p) ? "schedule-total--over" : "";
+      return `<td class="${overClass}">${periodTotals[p]} / ${limitMinutes}m</td>`;
+    }).join("")
+  }</tr>`;
+
+  return `<div class="schedule-table-wrap"><table class="schedule-table">
+    <thead><tr><th>Category</th>${headerCols}</tr></thead>
+    <tbody>${bodyRows}${totalsRow}</tbody>
+  </table></div>`;
 }
 
 function buildScheduleTableHTML(tasks, schedule, limitMinutes) {
