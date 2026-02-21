@@ -17,6 +17,7 @@ const state = {
   activePipelineStage: "all",
   schedules: {},
   scheduleEditMode: false,
+  contactLog: {},
 };
 
 // ── DB Mappers ─────────────────────────────────────────────
@@ -156,6 +157,25 @@ async function dbUpdateProspect(p) {
 async function dbDeleteProspect(id) {
   const { error } = await sb.from("prospects").delete().eq("id", id);
   if (error) console.error("Delete prospect error:", error);
+}
+
+// ── Contact Log DB ─────────────────────────────────────
+async function dbLoadContactLog(prospectId) {
+  const { data, error } = await sb.from("prospect_contact_log")
+    .select("*").eq("prospect_id", prospectId).order("contact_date", { ascending: false });
+  if (error) { console.error("Load contact log error:", error); return []; }
+  return data || [];
+}
+
+async function dbAddContactEntry(entry) {
+  const { data, error } = await sb.from("prospect_contact_log").insert(entry).select().single();
+  if (error) { console.error("Add contact log error:", error); alert("Error saving contact: " + error.message); return null; }
+  return data;
+}
+
+async function dbDeleteContactEntry(id) {
+  const { error } = await sb.from("prospect_contact_log").delete().eq("id", id);
+  if (error) console.error("Delete contact entry error:", error);
 }
 
 // ── Elements ───────────────────────────────────────────────
@@ -702,6 +722,7 @@ function openProspect(id) {
   `;
 
   renderProspectNotes(p);
+  loadAndRenderContactLog(id);
   document.getElementById("view-prospects").style.display = "none";
   document.getElementById("view-prospect-detail").style.display = "block";
 }
@@ -711,6 +732,90 @@ document.getElementById("btn-back-prospect").addEventListener("click", () => {
   document.getElementById("view-prospects").style.display = "block";
   state.currentProspectId = null;
   renderProspectList();
+});
+
+// ── Contact Log UI ─────────────────────────────────────────
+const METHOD_LABELS = { call: "📞 Call", text: "💬 Text", email: "✉️ Email", "in-person": "🤝 In-Person" };
+
+async function loadAndRenderContactLog(prospectId) {
+  const entries = await dbLoadContactLog(prospectId);
+  state.contactLog[prospectId] = entries;
+  renderContactLog(prospectId);
+}
+
+function renderContactLog(prospectId) {
+  const entries = state.contactLog[prospectId] || [];
+  const el = document.getElementById("contact-log-list");
+  if (!el) return;
+  if (entries.length === 0) {
+    el.innerHTML = `<div class="empty-state"><p>No contacts logged yet. Click <strong>+ Log Contact</strong> to record an outreach.</p></div>`;
+    return;
+  }
+  el.innerHTML = `<div class="clog-list">${entries.map(e => {
+    const repliedHtml = e.replied === "yes"
+      ? `<span class="clog-replied--yes">✓ Responded</span>`
+      : e.replied === "no"
+        ? `<span class="clog-replied--no">✗ No response</span>`
+        : "";
+    const followupHtml = e.follow_up_date
+      ? `<div class="clog-followup">📅 Follow-up: ${formatDate(e.follow_up_date)}</div>`
+      : "";
+    return `<div class="clog-item">
+      <div class="clog-date">${formatDate(e.contact_date)}</div>
+      <div class="clog-badges">
+        <span class="clog-method">${escapeHtml(METHOD_LABELS[e.method] || e.method)}</span>
+        ${repliedHtml}
+      </div>
+      <div>
+        <div class="clog-notes">${escapeHtml(e.notes || "")}</div>
+        ${followupHtml}
+      </div>
+      <button class="ghost danger icon-btn" data-action="delete-clog" data-id="${e.id}">✕</button>
+    </div>`;
+  }).join("")}</div>`;
+  el.querySelectorAll("[data-action='delete-clog']").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("Delete this contact entry?")) return;
+      await dbDeleteContactEntry(btn.dataset.id);
+      await loadAndRenderContactLog(prospectId);
+    });
+  });
+}
+
+document.getElementById("btn-add-contact-log").addEventListener("click", () => {
+  document.getElementById("clog-date").value = new Date().toISOString().slice(0, 10);
+  document.getElementById("clog-method").value = "call";
+  document.getElementById("clog-replied").value = "yes";
+  document.getElementById("clog-followup").value = "";
+  document.getElementById("clog-notes").value = "";
+  openModal("modal-contact-log");
+});
+
+document.getElementById("form-contact-log").addEventListener("submit", async e => {
+  e.preventDefault();
+  const prospectId = state.currentProspectId;
+  if (!prospectId) return;
+  const entry = {
+    prospect_id: prospectId,
+    contact_date: document.getElementById("clog-date").value,
+    method: document.getElementById("clog-method").value,
+    replied: document.getElementById("clog-replied").value,
+    follow_up_date: document.getElementById("clog-followup").value || null,
+    notes: document.getElementById("clog-notes").value.trim(),
+  };
+  const saved = await dbAddContactEntry(entry);
+  if (saved) {
+    const p = getProspect(prospectId);
+    if (p) {
+      p.lastContactDate = entry.contact_date;
+      if (entry.follow_up_date) p.followUpDate = entry.follow_up_date;
+      await dbUpdateProspect(p);
+      document.getElementById("prospect-last-contact").value = entry.contact_date;
+      if (entry.follow_up_date) document.getElementById("prospect-followup").value = entry.follow_up_date;
+    }
+    await loadAndRenderContactLog(prospectId);
+  }
+  closeModal("modal-contact-log");
 });
 
 // ── Prospect Notes ─────────────────────────────────────────
