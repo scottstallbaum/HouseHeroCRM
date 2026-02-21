@@ -1193,7 +1193,7 @@ function printSchedule(customerId) {
   thead th:first-child { text-align: left; width: 130px; }
   tbody th { font-style: italic; font-weight: 700; color: #5c2d0a; text-align: left; padding: 0.5rem 0.5rem; border: 1px solid #d4b896; vertical-align: top; background: #fdf8f2; }
   tbody td { border: 1px solid #d4b896; padding: 0.4rem 0.6rem; vertical-align: top; min-width: 80px; }
-  .ptask { margin: 2px 0; line-height: 1.4; }
+  .ptask { margin: 2px 0; line-height: 1.4; padding-left: 1em; text-indent: -1em; }
   /* Footer */
   .pf { background: #f5f0eb; text-align: center; font-size: 0.72rem; color: #8b4513; padding: 0.7rem 2rem; border-top: 2px solid #c8a882; }
   /* Print controls */
