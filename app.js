@@ -1016,6 +1016,12 @@ function updateScheduleTotals(customerId) {
       span.textContent = `${total} / ${limitMinutes}m`;
       const isOver = total > limitMinutes;
       span.parentElement.className = isOver ? "schedule-total--over" : "";
+      // Update all body cells and header in this column
+      document.querySelectorAll(`[data-period-col="${period}"]`).forEach(td => {
+        td.classList.toggle("schedule-col--over", isOver);
+      });
+      const headerTh = document.querySelector(`[data-period-header="${period}"]`);
+      if (headerTh) headerTh.classList.toggle("schedule-col--over", isOver);
     }
   });
 }
@@ -1068,13 +1074,23 @@ function buildScheduleSummaryHTML(tasks, schedule, limitMinutes) {
 }
 
 function buildScheduleTableHTML(tasks, schedule, limitMinutes) {
-  const headerCols = SCHEDULE_PERIODS.map(p => `<th>${escapeHtml(p)}</th>`).join("");
+  // Pre-calculate which periods exceed the limit
+  const overSet = new Set(SCHEDULE_PERIODS.filter(p => {
+    const ids = Array.isArray(schedule[p]) ? schedule[p] : [];
+    const total = ids.reduce((sum, id) => { const t = tasks.find(t => t.id === id); return sum + (t?.minutes || 0); }, 0);
+    return total > limitMinutes;
+  }));
+
+  const headerCols = SCHEDULE_PERIODS.map(p =>
+    `<th class="${overSet.has(p) ? 'schedule-col--over' : ''}" data-period-header="${escapeHtml(p)}">${escapeHtml(p)}</th>`
+  ).join("");
 
   const bodyRows = SCHEDULE_CATEGORIES.map(category => {
     const catTasks = tasks.filter(t => t.category === category);
     if (catTasks.length === 0) return "";
     const cells = SCHEDULE_PERIODS.map(period => {
       const ids = Array.isArray(schedule[period]) ? schedule[period] : [];
+      const overCellClass = overSet.has(period) ? " schedule-col--over" : "";
       const items = catTasks.map(task => {
         const checked = ids.includes(task.id) ? "checked" : "";
         return `<label class="schedule-choice">
@@ -1083,7 +1099,7 @@ function buildScheduleTableHTML(tasks, schedule, limitMinutes) {
           <span class="schedule-choice__time">${task.minutes}m</span>
         </label>`;
       }).join("");
-      return `<td>${items}</td>`;
+      return `<td class="${overCellClass}" data-period-col="${escapeHtml(period)}">${items}</td>`;
     }).join("");
     return `<tr><th class="category-cell">${escapeHtml(category)}</th>${cells}</tr>`;
   }).join("");

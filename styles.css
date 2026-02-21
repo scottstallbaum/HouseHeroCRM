@@ -829,6 +829,15 @@ textarea {
   color: #6d1a0a;
 }
 
+.schedule-table thead th.schedule-col--over {
+  background: #fde0da;
+  color: #6d1a0a;
+}
+
+.schedule-table tbody td.schedule-col--over {
+  background: #fef0ee;
+}
+
 .schedule-total--over {
   color: #6d1a0a;
   font-weight: 700;
