@@ -25,6 +25,7 @@ const state = {
 function customerFromDb(row) {
   return {
     id: row.id,
+    customerNumber: row.customer_number || null,
     firstName: row.first_name,
     lastName: row.last_name,
     street: row.street || "",
@@ -45,6 +46,7 @@ function customerFromDb(row) {
 
 function customerToDb(c) {
   return {
+    customer_number: c.customerNumber || null,
     first_name: c.firstName,
     last_name: c.lastName,
     street: c.street || null,
@@ -129,6 +131,9 @@ function getFullAddress(c) {
 
 // ── Supabase DB Operations ─────────────────────────────────
 async function dbInsertCustomer(data) {
+  if (!data.customerNumber) {
+    data.customerNumber = await generateCustomerNumber();
+  }
   const { data: row, error } = await sb.from("customers").insert(customerToDb(data)).select().single();
   if (error) { console.error(error); alert("Error saving customer: " + error.message); return null; }
   return customerFromDb(row);
@@ -202,6 +207,17 @@ async function dbUpdateGlobalTask(task) {
 async function dbDeleteGlobalTask(id) {
   const { error } = await sb.from("global_tasks").delete().eq("id", id);
   if (error) console.error("Delete global task error:", error);
+}
+
+// ── Customer Number Generator ──────────────────────────────
+async function generateCustomerNumber() {
+  const { data } = await sb.from("customers").select("customer_number").not("customer_number", "is", null);
+  let max = 0;
+  (data || []).forEach(row => {
+    const match = (row.customer_number || "").match(/HH-(\d+)/);
+    if (match) max = Math.max(max, parseInt(match[1], 10));
+  });
+  return `HH-${String(max + 1).padStart(4, "0")}`;
 }
 
 // ── Elements ───────────────────────────────────────────────
@@ -280,7 +296,8 @@ function renderCustomerList(filter = "") {
           ${c.startDate ? `<span>&#128197; Since ${formatDate(c.startDate)}</span>` : ""}
         </div>
       </div>
-      <div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:0.4rem;">
+        ${c.customerNumber ? `<span class="customer-number-badge">${escapeHtml(c.customerNumber)}</span>` : ""}
         <span class="customer-card__badge badge--${c.status || "active"}">${c.status || "active"}</span>
       </div>
     </div>
@@ -300,6 +317,7 @@ function openCustomer(id) {
   if (!c) return;
 
   document.getElementById("detail-name").textContent = `${c.firstName} ${c.lastName}`;
+  document.getElementById("detail-customer-number").textContent = c.customerNumber || "";
   const secondaryLine = c.secondary?.firstName
     ? ` & ${c.secondary.firstName} ${c.secondary.lastName}${c.secondary.relationship ? ` (${c.secondary.relationship})` : ""}`
     : "";
