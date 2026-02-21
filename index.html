@@ -30,6 +30,9 @@
       <a href="#" class="sidebar__link" data-view="schedule">
         <span class="sidebar__icon">📅</span> Schedule
       </a>
+      <a href="#" class="sidebar__link" data-view="task-library">
+        <span class="sidebar__icon">📋</span> Task Library
+      </a>
     </nav>
     <div class="sidebar__footer">
       <div class="sidebar__footer-text">House Hero LLC</div>
@@ -130,51 +133,12 @@
             <div style="display:flex;gap:0.5rem;">
               <button id="btn-print-schedule" type="button" class="ghost ghost--small">&#x1F5A8; Print Schedule</button>
               <button id="btn-edit-schedule" type="button" class="ghost ghost--small">Edit Schedule</button>
-              <button id="btn-toggle-task-library" type="button" class="ghost ghost--small" style="display:none;">Edit Task Library</button>
             </div>
           </div>
           <div id="schedule-card-body" style="margin-top:1rem;">
             <div class="empty-state"><p>Loading schedule...</p></div>
           </div>
-          <div id="task-library-panel" style="display:none;">
-            <div style="margin-top:1.5rem;border-top:1px solid var(--stroke);padding-top:1.5rem;">
-              <h3 style="margin:0 0 1rem;font-family:'Fraunces',serif;">Task Library</h3>
-              <form id="form-schedule-task" class="task-lib-form-add">
-                <label style="flex:1 1 200px;">
-                  Task name
-                  <input id="sched-task-name" type="text" placeholder="e.g. Pool Filter Clean" required />
-                </label>
-                <label style="flex:0 0 80px;">
-                  Minutes
-                  <input id="sched-task-minutes" type="number" min="1" max="180" placeholder="15" required />
-                </label>
-                <label style="flex:0 0 180px;">
-                  Category
-                  <select id="sched-task-category">
-                    <option value="Appliance Maintenance">Appliance Maintenance</option>
-                    <option value="Auto Maintenance">Auto Maintenance</option>
-                    <option value="Energy Efficiency">Energy Efficiency</option>
-                    <option value="Home Safety">Home Safety</option>
-                    <option value="HVAC">HVAC</option>
-                    <option value="Seasonal">Seasonal</option>
-                    <option value="Plumbing">Plumbing</option>
-                  </select>
-                </label>
-                <label style="flex:0 0 140px;">
-                  Frequency
-                  <select id="sched-task-frequency">
-                    <option value="every">Every visit</option>
-                    <option value="annual">Annual</option>
-                    <option value="adhoc">Ad hoc</option>
-                  </select>
-                </label>
-                <div style="display:flex;align-items:flex-end;padding-bottom:2px;">
-                  <button type="submit">+ Add Task</button>
-                </div>
-              </form>
-              <div id="schedule-task-table"></div>
-            </div>
-          </div>
+
         </section>
 
         <!-- Notes -->
@@ -305,6 +269,54 @@
         </section>
 
       </div>
+    </div>
+
+    <!-- Global Task Library View -->
+    <div id="view-task-library" class="view" style="display:none;">
+      <div class="view__header">
+        <div>
+          <h1 class="view__title">Task Library</h1>
+          <p class="view__subtitle">Master task list — changes here apply to all new customers and can be pushed to existing ones</p>
+        </div>
+        <button id="btn-push-global-tasks" type="button" class="ghost">&#8593; Push updates to all customers</button>
+      </div>
+      <div class="card" style="margin-bottom:1.25rem;">
+        <h2 style="margin:0 0 1rem;">Add New Task</h2>
+        <form id="form-global-task" class="task-lib-form-add">
+          <label style="flex:1 1 200px;">
+            Task name
+            <input id="gtask-name" type="text" placeholder="e.g. Pool Filter Clean" required />
+          </label>
+          <label style="flex:0 0 80px;">
+            Minutes
+            <input id="gtask-minutes" type="number" min="1" max="180" placeholder="15" required />
+          </label>
+          <label style="flex:0 0 180px;">
+            Category
+            <select id="gtask-category">
+              <option value="Appliance Maintenance">Appliance Maintenance</option>
+              <option value="Auto Maintenance">Auto Maintenance</option>
+              <option value="Energy Efficiency">Energy Efficiency</option>
+              <option value="Home Safety">Home Safety</option>
+              <option value="HVAC">HVAC</option>
+              <option value="Seasonal">Seasonal</option>
+              <option value="Plumbing">Plumbing</option>
+            </select>
+          </label>
+          <label style="flex:0 0 140px;">
+            Frequency
+            <select id="gtask-frequency">
+              <option value="every">Every visit</option>
+              <option value="annual">Annual</option>
+              <option value="adhoc">Ad hoc</option>
+            </select>
+          </label>
+          <div style="display:flex;align-items:flex-end;padding-bottom:2px;">
+            <button type="submit">+ Add Task</button>
+          </div>
+        </form>
+      </div>
+      <div id="global-task-table"></div>
     </div>
 
     <!-- Master Schedule View -->

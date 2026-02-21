@@ -17,6 +17,7 @@ const state = {
   activePipelineStage: "all",
   schedules: {},
   scheduleEditMode: false,
+  globalTasks: [],
   contactLog: {},
 };
 
@@ -178,6 +179,31 @@ async function dbDeleteContactEntry(id) {
   if (error) console.error("Delete contact entry error:", error);
 }
 
+// ── Global Task Library DB ─────────────────────────────
+async function dbLoadGlobalTasks() {
+  const { data, error } = await sb.from("global_tasks").select("*").order("category").order("name");
+  if (error) { console.error("Load global tasks error:", error); return []; }
+  return data || [];
+}
+
+async function dbInsertGlobalTask(task) {
+  const { data, error } = await sb.from("global_tasks").insert(task).select().single();
+  if (error) { alert("Error adding task: " + error.message); return null; }
+  return data;
+}
+
+async function dbUpdateGlobalTask(task) {
+  const { error } = await sb.from("global_tasks").update({
+    name: task.name, minutes: task.minutes, category: task.category, frequency: task.frequency
+  }).eq("id", task.id);
+  if (error) console.error("Update global task error:", error);
+}
+
+async function dbDeleteGlobalTask(id) {
+  const { error } = await sb.from("global_tasks").delete().eq("id", id);
+  if (error) console.error("Delete global task error:", error);
+}
+
 // ── Elements ───────────────────────────────────────────────
 const viewCustomers     = document.getElementById("view-customers");
 const viewDetail        = document.getElementById("view-detail");
@@ -195,14 +221,24 @@ const btnSaveService    = document.getElementById("btn-save-service");
 // ── Init ───────────────────────────────────────────────────
 async function init() {
   customerList.innerHTML = `<div class="empty-state"><p>Loading...</p></div>`;
-  const [custResult, prospResult] = await Promise.all([
+  const [custResult, prospResult, globalTasksResult] = await Promise.all([
     sb.from("customers").select("*").order("created_at", { ascending: false }),
     sb.from("prospects").select("*").order("created_at", { ascending: false }),
+    sb.from("global_tasks").select("*").order("category").order("name"),
   ]);
   if (custResult.error) console.error("Load customers error:", custResult.error);
   if (prospResult.error) console.error("Load prospects error:", prospResult.error);
   state.customers = (custResult.data || []).map(customerFromDb);
   state.prospects = (prospResult.data || []).map(prospectFromDb);
+  state.globalTasks = globalTasksResult.data || [];
+  // Seed global tasks table if empty (first run)
+  if (state.globalTasks.length === 0 && !globalTasksResult.error) {
+    const defaults = seedScheduleTasks();
+    const inserted = await Promise.all(defaults.map(t =>
+      sb.from("global_tasks").insert({ name: t.name, minutes: t.minutes, category: t.category, frequency: t.frequency }).select().single()
+    ));
+    state.globalTasks = inserted.map(r => r.data).filter(Boolean);
+  }
   renderCustomerList();
 }
 
@@ -611,6 +647,7 @@ document.querySelectorAll(".sidebar__link[data-view]").forEach(link => {
     document.getElementById("view-prospects").style.display = "none";
     document.getElementById("view-prospect-detail").style.display = "none";
     document.getElementById("view-schedule").style.display = "none";
+    document.getElementById("view-task-library").style.display = "none";
     if (view === "customers") {
       viewCustomers.style.display = "block";
       renderCustomerList(searchInput.value);
@@ -620,6 +657,9 @@ document.querySelectorAll(".sidebar__link[data-view]").forEach(link => {
     } else if (view === "schedule") {
       document.getElementById("view-schedule").style.display = "block";
       openMasterScheduleView();
+    } else if (view === "task-library") {
+      document.getElementById("view-task-library").style.display = "block";
+      renderGlobalTaskLibraryView();
     }
   });
 });
@@ -1054,22 +1094,19 @@ async function openScheduleForCustomer(customerId) {
   if (row) {
     state.schedules[customerId] = { year: row.year, tasks: row.tasks || [], schedule: row.schedule || {} };
   } else {
-    const tasks = seedScheduleTasks();
+    const tasks = state.globalTasks.length > 0
+      ? state.globalTasks.map(gt => ({ id: generateId(), globalId: gt.id, name: gt.name, minutes: gt.minutes, category: gt.category, frequency: gt.frequency }))
+      : seedScheduleTasks();
     state.schedules[customerId] = { year: SCHEDULE_YEAR, tasks, schedule: {} };
     await dbSaveSchedule(customerId, SCHEDULE_YEAR, tasks, {});
   }
 
   // Reset to view mode
   state.scheduleEditMode = false;
-  const panel = document.getElementById("task-library-panel");
-  if (panel) panel.style.display = "none";
-  const libBtn = document.getElementById("btn-toggle-task-library");
-  if (libBtn) { libBtn.textContent = "Edit Task Library"; libBtn.style.display = "none"; }
   const editBtn = document.getElementById("btn-edit-schedule");
   if (editBtn) editBtn.textContent = "Edit Schedule";
 
   renderScheduleCard(customerId);
-  renderScheduleTaskLibrary(customerId);
 }
 
 // ── Render Schedule Card (view or edit mode) ──────────────
@@ -1351,94 +1388,118 @@ document.getElementById("btn-print-schedule").addEventListener("click", () => {
 document.getElementById("btn-edit-schedule").addEventListener("click", () => {
   state.scheduleEditMode = !state.scheduleEditMode;
   document.getElementById("btn-edit-schedule").textContent = state.scheduleEditMode ? "Done" : "Edit Schedule";
-  const libBtn = document.getElementById("btn-toggle-task-library");
-  libBtn.style.display = state.scheduleEditMode ? "" : "none";
-  if (!state.scheduleEditMode) {
-    document.getElementById("task-library-panel").style.display = "none";
-    libBtn.textContent = "Edit Task Library";
-  }
   renderScheduleCard(state.currentCustomerId);
 });
 
 // ── Task Library ───────────────────────────────────────────
-document.getElementById("btn-toggle-task-library").addEventListener("click", () => {
-  const panel = document.getElementById("task-library-panel");
-  const isOpen = panel.style.display !== "none";
-  panel.style.display = isOpen ? "none" : "block";
-  document.getElementById("btn-toggle-task-library").textContent = isOpen ? "Edit Task Library" : "Close Task Library";
-});
-
-function renderScheduleTaskLibrary(customerId) {
-  const sched = state.schedules[customerId];
-  const container = document.getElementById("schedule-task-table");
-  if (!container || !sched) return;
-
+// ── Global Task Library View ───────────────────────────────
+function renderGlobalTaskLibraryView() {
+  const container = document.getElementById("global-task-table");
+  if (!container) return;
+  if (state.globalTasks.length === 0) {
+    container.innerHTML = `<div class="empty-state"><p>No tasks yet. Add one above.</p></div>`;
+    return;
+  }
   const html = SCHEDULE_CATEGORIES.map(category => {
-    const catTasks = sched.tasks.filter(t => t.category === category);
+    const catTasks = state.globalTasks.filter(t => t.category === category);
     if (catTasks.length === 0) return "";
     return `<div class="task-lib-group">
       <div class="task-lib-category-label">${escapeHtml(category)}</div>
       ${catTasks.map(task => `
         <div class="task-lib-row">
-          <input class="task-lib-input" data-field="name" data-id="${task.id}" type="text" value="${escapeHtml(task.name)}" />
-          <input class="task-lib-input" data-field="minutes" data-id="${task.id}" type="number" min="1" value="${task.minutes}" style="width:60px;" />
+          <input class="task-lib-input" data-field="name" data-gid="${task.id}" type="text" value="${escapeHtml(task.name)}" />
+          <input class="task-lib-input" data-field="minutes" data-gid="${task.id}" type="number" min="1" value="${task.minutes}" style="width:60px;" />
           <span class="task-lib-min-label">min</span>
-          <select data-field="frequency" data-id="${task.id}">
+          <select data-field="frequency" data-gid="${task.id}">
             <option value="every" ${task.frequency === "every" ? "selected" : ""}>Every visit</option>
             <option value="annual" ${task.frequency === "annual" ? "selected" : ""}>Annual</option>
             <option value="adhoc" ${task.frequency === "adhoc" ? "selected" : ""}>Ad hoc</option>
           </select>
-          <button type="button" class="ghost danger icon-btn" data-lib-remove="${task.id}">&#10005;</button>
+          <button type="button" class="ghost danger icon-btn" data-glib-remove="${task.id}">&#10005;</button>
         </div>`).join("")}
     </div>`;
   }).join("");
-
-  container.innerHTML = html || `<div class="empty-state"><p>No tasks. Add one above.</p></div>`;
+  container.innerHTML = html;
 
   container.querySelectorAll("[data-field]").forEach(input => {
     input.addEventListener("change", async () => {
-      const task = sched.tasks.find(t => t.id === input.dataset.id);
+      const task = state.globalTasks.find(t => t.id === input.dataset.gid);
       if (!task) return;
       if (input.dataset.field === "name") task.name = input.value.trim();
       if (input.dataset.field === "minutes") task.minutes = Number(input.value) || task.minutes;
       if (input.dataset.field === "frequency") task.frequency = input.value;
-      await dbSaveSchedule(state.currentCustomerId, sched.year, sched.tasks, sched.schedule);
-      renderScheduleCard(state.currentCustomerId);
+      await dbUpdateGlobalTask(task);
     });
   });
 
-  container.querySelectorAll("[data-lib-remove]").forEach(btn => {
+  container.querySelectorAll("[data-glib-remove]").forEach(btn => {
     btn.addEventListener("click", async () => {
-      if (!confirm("Remove this task?")) return;
-      const taskId = btn.dataset.libRemove;
-      sched.tasks = sched.tasks.filter(t => t.id !== taskId);
-      SCHEDULE_PERIODS.forEach(p => {
-        if (Array.isArray(sched.schedule[p])) {
-          sched.schedule[p] = sched.schedule[p].filter(id => id !== taskId);
-        }
-      });
-      await dbSaveSchedule(state.currentCustomerId, sched.year, sched.tasks, sched.schedule);
-      renderScheduleCard(state.currentCustomerId);
-      renderScheduleTaskLibrary(state.currentCustomerId);
+      if (!confirm("Delete this task from the global library?")) return;
+      await dbDeleteGlobalTask(btn.dataset.glibRemove);
+      state.globalTasks = state.globalTasks.filter(t => t.id !== btn.dataset.glibRemove);
+      renderGlobalTaskLibraryView();
     });
   });
 }
 
-document.getElementById("form-schedule-task").addEventListener("submit", async e => {
+document.getElementById("form-global-task").addEventListener("submit", async e => {
   e.preventDefault();
-  const customerId = state.currentCustomerId;
-  const sched = state.schedules[customerId];
-  if (!sched) return;
-  const name = document.getElementById("sched-task-name").value.trim();
-  const minutes = Number(document.getElementById("sched-task-minutes").value) || 10;
-  const category = document.getElementById("sched-task-category").value;
-  const frequency = document.getElementById("sched-task-frequency").value;
-  sched.tasks.push({ id: generateId(), name, minutes, category, frequency });
-  await dbSaveSchedule(customerId, sched.year, sched.tasks, sched.schedule);
-  renderScheduleCard(customerId);
-  renderScheduleTaskLibrary(customerId);
-  e.target.reset();
+  const task = {
+    name: document.getElementById("gtask-name").value.trim(),
+    minutes: Number(document.getElementById("gtask-minutes").value) || 15,
+    category: document.getElementById("gtask-category").value,
+    frequency: document.getElementById("gtask-frequency").value,
+  };
+  const saved = await dbInsertGlobalTask(task);
+  if (saved) {
+    state.globalTasks.push(saved);
+    // Also add to all existing customer schedules (unscheduled)
+    const rows = await dbLoadAllSchedules(SCHEDULE_YEAR);
+    await Promise.all(rows.map(async row => {
+      const tasks = [...(row.tasks || []), { id: generateId(), globalId: saved.id, name: saved.name, minutes: saved.minutes, category: saved.category, frequency: saved.frequency }];
+      await dbSaveSchedule(row.customer_id, row.year, tasks, row.schedule || {});
+      if (state.schedules[row.customer_id]) state.schedules[row.customer_id].tasks = tasks;
+    }));
+    renderGlobalTaskLibraryView();
+    e.target.reset();
+  }
 });
+
+document.getElementById("btn-push-global-tasks").addEventListener("click", async () => {
+  if (!confirm("Push all task name/minute/category/frequency updates to every customer's schedule?")) return;
+  const btn = document.getElementById("btn-push-global-tasks");
+  btn.disabled = true; btn.textContent = "Pushing...";
+  const rows = await dbLoadAllSchedules(SCHEDULE_YEAR);
+  let updated = 0;
+  for (const row of rows) {
+    let tasks = row.tasks || [];
+    let changed = false;
+    tasks = tasks.map(t => {
+      if (!t.globalId) return t;
+      const gt = state.globalTasks.find(g => g.id === t.globalId);
+      if (!gt) return t;
+      if (t.name !== gt.name || t.minutes !== gt.minutes || t.category !== gt.category || t.frequency !== gt.frequency) {
+        changed = true;
+        return { ...t, name: gt.name, minutes: gt.minutes, category: gt.category, frequency: gt.frequency };
+      }
+      return t;
+    });
+    // Add any new global tasks missing from this customer
+    const existingGlobalIds = new Set(tasks.filter(t => t.globalId).map(t => t.globalId));
+    const newTasks = state.globalTasks.filter(gt => !existingGlobalIds.has(gt.id)).map(gt => ({
+      id: generateId(), globalId: gt.id, name: gt.name, minutes: gt.minutes, category: gt.category, frequency: gt.frequency
+    }));
+    if (newTasks.length) { tasks = [...tasks, ...newTasks]; changed = true; }
+    if (changed) {
+      await dbSaveSchedule(row.customer_id, row.year, tasks, row.schedule || {});
+      if (state.schedules[row.customer_id]) state.schedules[row.customer_id].tasks = tasks;
+      updated++;
+    }
+  }
+  btn.disabled = false; btn.textContent = "↑ Push updates to all customers";
+  alert(`Done! Updated ${updated} customer schedule${updated !== 1 ? "s" : ""}.`);
+});
+
 
 // ── Master Schedule View ───────────────────────────────────
 let activeMasterPeriod = SCHEDULE_PERIODS[0];
