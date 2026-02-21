@@ -1199,7 +1199,7 @@ function printSchedule(customerId) {
   /* Print controls */
   .print-controls { text-align: center; padding: 1.5rem; background: #f5f0eb; }
   .tip { display: inline-block; background: #fffbe6; border: 1px solid #f0c88a; border-radius: 8px; padding: 0.5rem 1rem; font-size: 0.78rem; margin-bottom: 1rem; }
-  .tip::before { content: '\1F4A1  '; }
+  .tip::before { content: '💡  '; }
   .btn-print { background: #2e6070; color: #fff; border: none; border-radius: 8px; padding: 0.6rem 1.8rem; font-size: 1rem; cursor: pointer; margin-right: 0.75rem; }
   .btn-cancel { background: transparent; border: 2px solid #5c2d0a; border-radius: 8px; padding: 0.6rem 1.4rem; font-size: 1rem; cursor: pointer; color: #5c2d0a; }
   @media print {
