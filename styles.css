@@ -1339,6 +1339,14 @@ textarea::placeholder {
   text-overflow: ellipsis;
 }
 
+.cal-week-pill__tech {
+  font-size: 0.7rem;
+  opacity: 0.72;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .cal-week-pill--maintenance {
   background: #dbeafe;
   border-left-color: #3b82f6;

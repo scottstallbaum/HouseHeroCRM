@@ -2064,10 +2064,13 @@ function appointmentPillHtml(a) {
   const tech = a.technicianId ? state.technicians.find(t => t.id === a.technicianId) : null;
   const statusClass = a.status === "completed" ? "completed" : a.status === "cancelled" ? "cancelled" : "scheduled";
   const line1 = a.startTime ? formatTime(a.startTime) : "TBD";
-  const line2 = cust ? `${escapeHtml(cust.firstName)} ${escapeHtml(cust.lastName)}` : (tech ? escapeHtml(tech.firstName + " " + tech.lastName) : (APPT_TYPE_LABELS[a.type] || a.type).replace(/^\S+\s/, ""));
-  return `<div class="cal-week-pill cal-week-pill--${escapeHtml(a.type)} appt-status--${statusClass}" data-appt-id="${a.id}" title="${escapeHtml((APPT_TYPE_LABELS[a.type]||a.type).replace(/^\S+\s/,''))}${cust ? ' — '+cust.firstName+' '+cust.lastName : ''}${a.startTime ? ' @ '+formatTime(a.startTime) : ''}">
+  const line2 = cust ? `${escapeHtml(cust.firstName)} ${escapeHtml(cust.lastName)}` : (APPT_TYPE_LABELS[a.type] || a.type).replace(/^\S+\s/, "");
+  const line3 = tech ? `${escapeHtml(tech.firstName)} ${escapeHtml(tech.lastName)}` : "";
+  const tooltip = `${(APPT_TYPE_LABELS[a.type]||a.type).replace(/^\S+\s/,'')}${cust ? ' \u2014 '+cust.firstName+' '+cust.lastName : ''}${tech ? ' \u00b7 '+tech.firstName+' '+tech.lastName : ''}${a.startTime ? ' @ '+formatTime(a.startTime) : ''}`;
+  return `<div class="cal-week-pill cal-week-pill--${escapeHtml(a.type)} appt-status--${statusClass}" data-appt-id="${a.id}" title="${escapeHtml(tooltip)}">
     <span class="cal-week-pill__time">${line1}</span>
     <span class="cal-week-pill__name">${line2}</span>
+    ${line3 ? `<span class="cal-week-pill__tech">${line3}</span>` : ""}
   </div>`;
 }
 
