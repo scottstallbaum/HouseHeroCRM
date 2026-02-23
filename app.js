@@ -19,6 +19,9 @@ const state = {
   scheduleEditMode: false,
   globalTasks: [],
   contactLog: {},
+  technicians: [],
+  currentTechnicianId: null,
+  editingTechnicianId: null,
 };
 
 // ── DB Mappers ─────────────────────────────────────────────
@@ -38,6 +41,7 @@ function customerFromDb(row) {
     plan: row.plan || "",
     startDate: row.start_date || "",
     minutesLimit: row.minutes_limit || 75,
+    technicianId: row.technician_id || null,
     secondary: row.secondary || null,
     contacts: row.contacts || [],
     notes: row.notes || [],
@@ -59,6 +63,7 @@ function customerToDb(c) {
     plan: c.plan || null,
     start_date: c.startDate || null,
     minutes_limit: c.minutesLimit || 75,
+    technician_id: c.technicianId || null,
     secondary: c.secondary || null,
     contacts: c.contacts || [],
     notes: c.notes || [],
@@ -220,6 +225,46 @@ async function generateCustomerNumber() {
   return `HH-${String(max + 1).padStart(4, "0")}`;
 }
 
+// ── Technician Mappers ─────────────────────────────
+function technicianFromDb(row) {
+  return {
+    id: row.id,
+    firstName: row.first_name,
+    lastName: row.last_name,
+    phone: row.phone || "",
+    email: row.email || "",
+    role: row.role || "lead",
+    status: row.status || "active",
+  };
+}
+
+function technicianToDb(t) {
+  return {
+    first_name: t.firstName,
+    last_name: t.lastName,
+    phone: t.phone || null,
+    email: t.email || null,
+    role: t.role || "lead",
+    status: t.status || "active",
+  };
+}
+
+async function dbInsertTechnician(t) {
+  const { data: row, error } = await sb.from("technicians").insert(technicianToDb(t)).select().single();
+  if (error) { console.error(error); alert("Error saving technician: " + error.message); return null; }
+  return technicianFromDb(row);
+}
+
+async function dbUpdateTechnician(t) {
+  const { error } = await sb.from("technicians").update(technicianToDb(t)).eq("id", t.id);
+  if (error) console.error("Update technician error:", error);
+}
+
+async function dbDeleteTechnician(id) {
+  const { error } = await sb.from("technicians").delete().eq("id", id);
+  if (error) console.error("Delete technician error:", error);
+}
+
 // ── Elements ───────────────────────────────────────────────
 const viewCustomers     = document.getElementById("view-customers");
 const viewDetail        = document.getElementById("view-detail");
@@ -237,16 +282,18 @@ const btnSaveService    = document.getElementById("btn-save-service");
 // ── Init ───────────────────────────────────────────────────
 async function init() {
   customerList.innerHTML = `<div class="empty-state"><p>Loading...</p></div>`;
-  const [custResult, prospResult, globalTasksResult] = await Promise.all([
+  const [custResult, prospResult, globalTasksResult, techResult] = await Promise.all([
     sb.from("customers").select("*").order("created_at", { ascending: false }),
     sb.from("prospects").select("*").order("created_at", { ascending: false }),
     sb.from("global_tasks").select("*").order("category").order("name"),
+    sb.from("technicians").select("*").order("last_name"),
   ]);
   if (custResult.error) console.error("Load customers error:", custResult.error);
   if (prospResult.error) console.error("Load prospects error:", prospResult.error);
   state.customers = (custResult.data || []).map(customerFromDb);
   state.prospects = (prospResult.data || []).map(prospectFromDb);
   state.globalTasks = globalTasksResult.data || [];
+  state.technicians = (techResult.data || []).map(technicianFromDb);
   // Seed global tasks table if empty (first run)
   if (state.globalTasks.length === 0 && !globalTasksResult.error) {
     const defaults = seedScheduleTasks();
@@ -285,7 +332,9 @@ function renderCustomerList(filter = "") {
     return;
   }
 
-  customerList.innerHTML = filtered.map(c => `
+  customerList.innerHTML = filtered.map(c => {
+    const tech = c.technicianId ? state.technicians.find(t => t.id === c.technicianId) : null;
+    return `
     <div class="customer-card" data-id="${c.id}">
       <div>
         <div class="customer-card__name">${escapeHtml(c.firstName)} ${escapeHtml(c.lastName)}${c.secondary?.firstName ? ` <span class="customer-card__secondary">&amp; ${escapeHtml(c.secondary.firstName)} ${escapeHtml(c.secondary.lastName)} <span class="customer-card__rel">(${escapeHtml(c.secondary.relationship || "secondary")})</span></span>` : ""}</div>
@@ -294,6 +343,7 @@ function renderCustomerList(filter = "") {
           ${c.phone ? `<span>&#128222; ${escapeHtml(c.phone)}</span>` : ""}
           ${c.email ? `<span>&#9993; ${escapeHtml(c.email)}</span>` : ""}
           ${c.startDate ? `<span>&#128197; Since ${formatDate(c.startDate)}</span>` : ""}
+          ${tech ? `<span>🔧 ${escapeHtml(tech.firstName)} ${escapeHtml(tech.lastName)}</span>` : ""}
         </div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:0.4rem;">
@@ -301,7 +351,8 @@ function renderCustomerList(filter = "") {
         <span class="customer-card__badge badge--${c.status || "active"}">${c.status || "active"}</span>
       </div>
     </div>
-  `).join("");
+  `;
+  }).join("");
 
   customerList.querySelectorAll(".customer-card").forEach(el => {
     el.addEventListener("click", () => openCustomer(el.dataset.id));
@@ -326,6 +377,8 @@ function openCustomer(id) {
   document.getElementById("detail-start-date").value = c.startDate || "";
   document.getElementById("detail-minutes").value = c.minutesLimit || 75;
   document.getElementById("detail-status").value = c.status || "active";
+  populateTechnicianDropdown();
+  document.getElementById("detail-technician").value = c.technicianId || "";
 
   document.getElementById("btn-open-scheduler").onclick = () => {
     window.open(`https://scottstallbaum.github.io/HouseHeroSchedulerv1/?customer=${encodeURIComponent(c.firstName + " " + c.lastName)}`, "_blank");
@@ -524,12 +577,24 @@ btnSaveService.addEventListener("click", async () => {
   c.startDate = document.getElementById("detail-start-date").value;
   c.minutesLimit = Number(document.getElementById("detail-minutes").value) || 75;
   c.status = document.getElementById("detail-status").value;
+  c.technicianId = document.getElementById("detail-technician").value || null;
   await dbUpdateCustomer(c);
 
   btnSaveService.textContent = "Saved \u2713";
   setTimeout(() => { btnSaveService.textContent = "Save Service Details"; }, 2000);
   renderCustomerList(searchInput.value);
 });
+
+function populateTechnicianDropdown() {
+  const sel = document.getElementById("detail-technician");
+  const current = sel.value;
+  sel.innerHTML = `<option value="">-- Unassigned --</option>` +
+    state.technicians
+      .filter(t => t.status === "active")
+      .map(t => `<option value="${t.id}">${escapeHtml(t.firstName)} ${escapeHtml(t.lastName)}</option>`)
+      .join("");
+  sel.value = current;
+}
 
 // ── Add / Edit Customer modal ──────────────────────────────
 btnAddCustomer.addEventListener("click", () => {
@@ -666,6 +731,8 @@ document.querySelectorAll(".sidebar__link[data-view]").forEach(link => {
     document.getElementById("view-prospect-detail").style.display = "none";
     document.getElementById("view-schedule").style.display = "none";
     document.getElementById("view-task-library").style.display = "none";
+    document.getElementById("view-technicians").style.display = "none";
+    document.getElementById("view-technician-detail").style.display = "none";
     if (view === "customers") {
       viewCustomers.style.display = "block";
       renderCustomerList(searchInput.value);
@@ -678,8 +745,160 @@ document.querySelectorAll(".sidebar__link[data-view]").forEach(link => {
     } else if (view === "task-library") {
       document.getElementById("view-task-library").style.display = "block";
       renderGlobalTaskLibraryView();
+    } else if (view === "technicians") {
+      document.getElementById("view-technicians").style.display = "block";
+      renderTechnicianList();
     }
   });
+});
+
+// ── Technicians ────────────────────────────────────────────
+const TECH_ROLE_LABELS = {
+  lead: "Lead Technician", assistant: "Assistant",
+  "part-time": "Part-Time", subcontractor: "Subcontractor",
+};
+
+function getTechnician(id) {
+  return state.technicians.find(t => t.id === id);
+}
+
+function renderTechnicianList() {
+  const listEl = document.getElementById("technician-list");
+  const countEl = document.getElementById("technician-count");
+  const total = state.technicians.length;
+  countEl.textContent = `${total} technician${total !== 1 ? "s" : ""}`;
+  if (total === 0) {
+    listEl.innerHTML = `<div class="empty-state"><p>No technicians yet.</p><p>Click "+ Add Technician" to get started.</p></div>`;
+    return;
+  }
+  listEl.innerHTML = state.technicians.map(t => {
+    const assignedCount = state.customers.filter(c => c.technicianId === t.id).length;
+    return `
+      <div class="customer-card" data-id="${t.id}">
+        <div>
+          <div class="customer-card__name">${escapeHtml(t.firstName)} ${escapeHtml(t.lastName)}</div>
+          <div class="customer-card__meta">
+            <span>${escapeHtml(TECH_ROLE_LABELS[t.role] || t.role)}</span>
+            ${t.phone ? `<span>&#128222; ${escapeHtml(t.phone)}</span>` : ""}
+            ${t.email ? `<span>&#9993; ${escapeHtml(t.email)}</span>` : ""}
+            <span>&#128100; ${assignedCount} customer${assignedCount !== 1 ? "s" : ""} assigned</span>
+          </div>
+        </div>
+        <div><span class="customer-card__badge badge--${t.status}">${t.status}</span></div>
+      </div>`;
+  }).join("");
+  listEl.querySelectorAll(".customer-card").forEach(el => {
+    el.addEventListener("click", () => openTechnician(el.dataset.id));
+  });
+}
+
+function openTechnician(id) {
+  state.currentTechnicianId = id;
+  const t = getTechnician(id);
+  if (!t) return;
+  document.getElementById("technician-detail-name").textContent = `${t.firstName} ${t.lastName}`;
+  document.getElementById("technician-detail-role").textContent = TECH_ROLE_LABELS[t.role] || t.role;
+
+  const info = document.getElementById("technician-contact-info");
+  info.innerHTML = `
+    <div class="prospect-contact-info__row">
+      <span class="prospect-contact-info__label">Phone</span>
+      <span>${t.phone ? `<a href="tel:${escapeHtml(t.phone)}">${escapeHtml(t.phone)}</a>` : '<em style="color:var(--muted)">Not on file</em>'}</span>
+    </div>
+    <div class="prospect-contact-info__row">
+      <span class="prospect-contact-info__label">Email</span>
+      <span>${t.email ? `<a href="mailto:${escapeHtml(t.email)}">${escapeHtml(t.email)}</a>` : '<em style="color:var(--muted)">Not on file</em>'}</span>
+    </div>
+    <div class="prospect-contact-info__row">
+      <span class="prospect-contact-info__label">Role</span>
+      <span>${escapeHtml(TECH_ROLE_LABELS[t.role] || t.role)}</span>
+    </div>
+    <div class="prospect-contact-info__row">
+      <span class="prospect-contact-info__label">Status</span>
+      <span><span class="customer-card__badge badge--${t.status}">${t.status}</span></span>
+    </div>`;
+
+  document.getElementById("view-technicians").style.display = "none";
+  document.getElementById("view-technician-detail").style.display = "block";
+}
+
+document.getElementById("btn-back-technician").addEventListener("click", () => {
+  document.getElementById("view-technician-detail").style.display = "none";
+  document.getElementById("view-technicians").style.display = "block";
+  state.currentTechnicianId = null;
+  renderTechnicianList();
+});
+
+document.getElementById("btn-add-technician").addEventListener("click", () => {
+  state.editingTechnicianId = null;
+  document.getElementById("modal-technician-title").textContent = "Add Technician";
+  document.getElementById("tech-first").value = "";
+  document.getElementById("tech-last").value = "";
+  document.getElementById("tech-phone").value = "";
+  document.getElementById("tech-email").value = "";
+  document.getElementById("tech-role").value = "lead";
+  document.getElementById("tech-status").value = "active";
+  openModal("modal-technician");
+});
+
+document.getElementById("btn-edit-technician").addEventListener("click", () => {
+  const t = getTechnician(state.currentTechnicianId);
+  if (!t) return;
+  state.editingTechnicianId = t.id;
+  document.getElementById("modal-technician-title").textContent = "Edit Technician";
+  document.getElementById("tech-first").value = t.firstName;
+  document.getElementById("tech-last").value = t.lastName;
+  document.getElementById("tech-phone").value = t.phone || "";
+  document.getElementById("tech-email").value = t.email || "";
+  document.getElementById("tech-role").value = t.role || "lead";
+  document.getElementById("tech-status").value = t.status || "active";
+  openModal("modal-technician");
+});
+
+document.getElementById("btn-delete-technician").addEventListener("click", async () => {
+  const t = getTechnician(state.currentTechnicianId);
+  if (!t) return;
+  const assigned = state.customers.filter(c => c.technicianId === t.id);
+  if (assigned.length > 0) {
+    if (!confirm(`${t.firstName} ${t.lastName} is assigned to ${assigned.length} customer${assigned.length !== 1 ? "s" : ""}. Deleting will unassign them. Continue?`)) return;
+    for (const c of assigned) {
+      c.technicianId = null;
+      await dbUpdateCustomer(c);
+    }
+  } else {
+    if (!confirm(`Delete ${t.firstName} ${t.lastName}? This cannot be undone.`)) return;
+  }
+  await dbDeleteTechnician(state.currentTechnicianId);
+  state.technicians = state.technicians.filter(x => x.id !== state.currentTechnicianId);
+  document.getElementById("view-technician-detail").style.display = "none";
+  document.getElementById("view-technicians").style.display = "block";
+  state.currentTechnicianId = null;
+  renderTechnicianList();
+});
+
+document.getElementById("form-technician").addEventListener("submit", async e => {
+  e.preventDefault();
+  const data = {
+    firstName: document.getElementById("tech-first").value.trim(),
+    lastName: document.getElementById("tech-last").value.trim(),
+    phone: document.getElementById("tech-phone").value.trim(),
+    email: document.getElementById("tech-email").value.trim(),
+    role: document.getElementById("tech-role").value,
+    status: document.getElementById("tech-status").value,
+  };
+  if (state.editingTechnicianId) {
+    const idx = state.technicians.findIndex(t => t.id === state.editingTechnicianId);
+    if (idx !== -1) {
+      state.technicians[idx] = { ...state.technicians[idx], ...data };
+      await dbUpdateTechnician(state.technicians[idx]);
+      openTechnician(state.editingTechnicianId);
+    }
+  } else {
+    const newTech = await dbInsertTechnician(data);
+    if (newTech) state.technicians.push(newTech);
+    renderTechnicianList();
+  }
+  closeModal("modal-technician");
 });
 
 // ── Prospects ──────────────────────────────────────────────

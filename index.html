@@ -33,6 +33,9 @@
       <a href="#" class="sidebar__link" data-view="task-library">
         <span class="sidebar__icon">📋</span> Task Library
       </a>
+      <a href="#" class="sidebar__link" data-view="technicians">
+        <span class="sidebar__icon">🔧</span> Technicians
+      </a>
     </nav>
     <div class="sidebar__footer">
       <div class="sidebar__footer-text">House Hero LLC</div>
@@ -121,6 +124,12 @@
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
                 <option value="prospect">Prospect</option>
+              </select>
+            </label>
+            <label>
+              Assigned Technician
+              <select id="detail-technician">
+                <option value="">-- Unassigned --</option>
               </select>
             </label>
           </div>
@@ -343,6 +352,39 @@
       </div>
       <div id="master-schedule-list" style="margin-top:1.25rem;">
         <div class="empty-state"><p>Loading...</p></div>
+      </div>
+    </div>
+
+    <!-- Technician List View -->
+    <div id="view-technicians" class="view" style="display:none;">
+      <div class="view__header">
+        <div>
+          <h1 class="view__title">Technicians</h1>
+          <p class="view__subtitle" id="technician-count">Loading...</p>
+        </div>
+        <button id="btn-add-technician" type="button">+ Add Technician</button>
+      </div>
+      <div id="technician-list" class="customer-list"></div>
+    </div>
+
+    <!-- Technician Detail View -->
+    <div id="view-technician-detail" class="view" style="display:none;">
+      <div class="view__header">
+        <div>
+          <button id="btn-back-technician" class="ghost btn-back" type="button">← Back to technicians</button>
+          <h1 class="view__title" id="technician-detail-name">Technician Name</h1>
+          <p class="view__subtitle" id="technician-detail-role"></p>
+        </div>
+        <div class="detail-actions">
+          <button id="btn-edit-technician" type="button" class="ghost">Edit</button>
+          <button id="btn-delete-technician" type="button" class="ghost danger">Delete</button>
+        </div>
+      </div>
+      <div class="detail-grid">
+        <section class="card card--full">
+          <div class="card__header"><h2>Contact Info</h2></div>
+          <div id="technician-contact-info" class="prospect-contact-info"></div>
+        </section>
       </div>
     </div>
 
@@ -645,6 +687,56 @@
         <div class="modal__actions">
           <button type="submit">Save Note</button>
           <button type="button" class="ghost" data-close="modal-prospect-note">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Add/Edit Technician -->
+  <div id="modal-technician" class="modal" style="display:none;">
+    <div class="modal__box">
+      <div class="modal__header">
+        <h2 id="modal-technician-title">Add Technician</h2>
+        <button class="modal__close" data-close="modal-technician" type="button">✕</button>
+      </div>
+      <form id="form-technician">
+        <div class="form-grid">
+          <label>
+            First Name *
+            <input type="text" id="tech-first" required placeholder="Jane" />
+          </label>
+          <label>
+            Last Name *
+            <input type="text" id="tech-last" required placeholder="Doe" />
+          </label>
+          <label>
+            Phone
+            <input type="tel" id="tech-phone" placeholder="(570) 555-1234" />
+          </label>
+          <label>
+            Email
+            <input type="email" id="tech-email" placeholder="jane@househeropa.com" />
+          </label>
+          <label>
+            Role
+            <select id="tech-role">
+              <option value="lead">Lead Technician</option>
+              <option value="assistant">Assistant</option>
+              <option value="part-time">Part-Time</option>
+              <option value="subcontractor">Subcontractor</option>
+            </select>
+          </label>
+          <label>
+            Status
+            <select id="tech-status">
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </label>
+        </div>
+        <div class="modal__actions">
+          <button type="submit">Save Technician</button>
+          <button type="button" class="ghost" data-close="modal-technician">Cancel</button>
         </div>
       </form>
     </div>
