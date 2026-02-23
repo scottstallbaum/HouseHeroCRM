@@ -711,8 +711,77 @@ const STAGE_LABELS = {
   proposal: "Proposed Schedule Sent", won: "Won", lost: "Lost",
 };
 
+function prospectCardHtml(p) {
+  const addr = getProspectAddress(p);
+  const stageLabel = STAGE_LABELS[p.stage] || "New Lead";
+  return `
+    <div class="customer-card" data-id="${p.id}">
+      <div>
+        <div class="customer-card__name">${escapeHtml(p.firstName)} ${escapeHtml(p.lastName)}</div>
+        <div class="customer-card__meta">
+          ${addr ? `<span>&#128205; ${escapeHtml(addr)}</span>` : ""}
+          ${p.phone ? `<span>&#128222; ${escapeHtml(p.phone)}</span>` : ""}
+          ${p.followUpDate ? `<span>&#128197; Follow-up: ${formatDate(p.followUpDate)}</span>` : ""}
+        </div>
+      </div>
+      <div><span class="customer-card__badge badge--${p.stage || "new"}">${stageLabel}</span></div>
+    </div>`;
+}
+
+function renderFollowUpsList() {
+  const listEl = document.getElementById("prospect-list");
+  const today = new Date(); today.setHours(0,0,0,0);
+  const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
+  const nextWeekEnd = new Date(today); nextWeekEnd.setDate(today.getDate() + 7);
+
+  const withDates = state.prospects.filter(p => p.followUpDate && p.stage !== "won" && p.stage !== "lost");
+
+  const groups = {
+    pastDue:   withDates.filter(p => new Date(p.followUpDate) < today),
+    today:     withDates.filter(p => new Date(p.followUpDate).toDateString() === today.toDateString()),
+    tomorrow:  withDates.filter(p => new Date(p.followUpDate).toDateString() === tomorrow.toDateString()),
+    thisWeek:  withDates.filter(p => {
+      const d = new Date(p.followUpDate);
+      return d > tomorrow && d <= nextWeekEnd;
+    }),
+  };
+
+  const total = groups.pastDue.length + groups.today.length + groups.tomorrow.length + groups.thisWeek.length;
+  if (total === 0) {
+    listEl.innerHTML = `<div class="empty-state"><p>No follow-ups due. You're all caught up! ✅</p></div>`;
+    return;
+  }
+
+  const section = (label, urgency, prospects) => {
+    if (prospects.length === 0) return "";
+    const sorted = [...prospects].sort((a, b) => new Date(a.followUpDate) - new Date(b.followUpDate));
+    return `<div class="followup-section">
+      <div class="followup-section__header followup-section__header--${urgency}">${label} <span class="followup-section__count">${prospects.length}</span></div>
+      ${sorted.map(prospectCardHtml).join("")}
+    </div>`;
+  };
+
+  listEl.innerHTML =
+    section("⚠️ Past Due", "pastdue", groups.pastDue) +
+    section("🔴 Due Today", "today", groups.today) +
+    section("🟡 Due Tomorrow", "tomorrow", groups.tomorrow) +
+    section("🟢 Due This Week", "week", groups.thisWeek);
+
+  listEl.querySelectorAll(".customer-card").forEach(el => {
+    el.addEventListener("click", () => openProspect(el.dataset.id));
+  });
+}
+
 function renderProspectList() {
   const stage = state.activePipelineStage;
+  const total = state.prospects.length;
+  document.getElementById("prospect-count").textContent = `${total} prospect${total !== 1 ? "s" : ""}`;
+
+  if (stage === "followups") {
+    renderFollowUpsList();
+    return;
+  }
+
   const q = document.getElementById("prospect-search-input").value.toLowerCase();
   const filtered = state.prospects.filter(p => {
     const nameMatch = `${p.firstName} ${p.lastName}`.toLowerCase().includes(q) ||
@@ -722,31 +791,13 @@ function renderProspectList() {
     return nameMatch && stageMatch;
   });
 
-  const total = state.prospects.length;
-  document.getElementById("prospect-count").textContent = `${total} prospect${total !== 1 ? "s" : ""}`;
-
   const listEl = document.getElementById("prospect-list");
   if (filtered.length === 0) {
     listEl.innerHTML = `<div class="empty-state"><p>No prospects found.</p><p>Click "+ Add Prospect" to get started.</p></div>`;
     return;
   }
 
-  listEl.innerHTML = filtered.map(p => {
-    const addr = getProspectAddress(p);
-    const stageLabel = STAGE_LABELS[p.stage] || "New Lead";
-    return `
-      <div class="customer-card" data-id="${p.id}">
-        <div>
-          <div class="customer-card__name">${escapeHtml(p.firstName)} ${escapeHtml(p.lastName)}</div>
-          <div class="customer-card__meta">
-            ${addr ? `<span>&#128205; ${escapeHtml(addr)}</span>` : ""}
-            ${p.phone ? `<span>&#128222; ${escapeHtml(p.phone)}</span>` : ""}
-            ${p.followUpDate ? `<span>&#128197; Follow-up: ${formatDate(p.followUpDate)}</span>` : ""}
-          </div>
-        </div>
-        <div><span class="customer-card__badge badge--${p.stage || "new"}">${stageLabel}</span></div>
-      </div>`;
-  }).join("");
+  listEl.innerHTML = filtered.map(prospectCardHtml).join("");
 
   listEl.querySelectorAll(".customer-card").forEach(el => {
     el.addEventListener("click", () => openProspect(el.dataset.id));
