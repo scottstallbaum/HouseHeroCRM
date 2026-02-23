@@ -2768,6 +2768,71 @@ function openEditAppointmentModal(apptId) {
   openModal("modal-appointment");
 }
 
+// ── Availability Validation ───────────────────────────────
+// Returns { ok: true } or { ok: false, reason: string }
+function checkTechAvailability(technicianId, dateStr, startTime, endTime) {
+  if (!technicianId || !dateStr) return { ok: true };
+
+  // Parse day-of-week safely from date string (no timezone shift)
+  const [y, mo, d] = dateStr.split("-").map(Number);
+  const jsDate = new Date(y, mo - 1, d);
+  const dow = jsDate.getDay(); // 0=Sun .. 6=Sat
+
+  const tech = state.technicians.find(t => t.id === technicianId);
+  const techName = tech ? `${tech.firstName} ${tech.lastName}` : "This technician";
+
+  // 1. Company-wide closure?
+  const companyClosure = state.availabilityOverrides.find(
+    o => o.technicianId === null && o.date === dateStr
+  );
+  if (companyClosure) {
+    const label = companyClosure.note ? `"${companyClosure.note}"` : "a company closure";
+    return { ok: false, reason: `${dateStr} is marked as ${label} (company closed).` };
+  }
+
+  // 2. Technician-specific override for this date?
+  const override = state.availabilityOverrides.find(
+    o => o.technicianId === technicianId && o.date === dateStr
+  );
+  if (override) {
+    if (override.isDayOff) {
+      const label = override.note ? `"${override.note}"` : "a day off";
+      return { ok: false, reason: `${techName} has ${label} on ${dateStr}.` };
+    }
+    // Custom blocks — check if appointment fits within any block
+    if (startTime && endTime && override.blocks && override.blocks.length > 0) {
+      const fits = override.blocks.some(b => startTime >= b.start && endTime <= b.end);
+      if (!fits) {
+        const blockStr = override.blocks.map(b => `${formatTime(b.start)}–${formatTime(b.end)}`).join(", ");
+        return { ok: false, reason: `${techName} has custom hours on ${dateStr}: ${blockStr}. The appointment (${formatTime(startTime)}–${formatTime(endTime)}) falls outside those hours.` };
+      }
+    }
+    return { ok: true }; // override exists with custom hours and appt fits (or no times provided)
+  }
+
+  // 3. Weekly schedule — does the tech have any blocks on this day?
+  const dayBlocks = state.weeklyAvailability.filter(
+    b => b.technicianId === technicianId && b.dayOfWeek === dow
+  );
+  if (dayBlocks.length === 0) {
+    return { ok: false, reason: `${techName} is not scheduled on ${DAY_NAMES[dow]}s.` };
+  }
+
+  // If no specific times given, just day-level check passes
+  if (!startTime || !endTime) return { ok: true };
+
+  // Check appointment fits within at least one weekly block
+  const fits = dayBlocks.some(b => startTime >= b.startTime && endTime <= b.endTime);
+  if (!fits) {
+    const blockStr = dayBlocks
+      .sort((a, b) => a.startTime.localeCompare(b.startTime))
+      .map(b => `${formatTime(b.startTime)}–${formatTime(b.endTime)}`).join(", ");
+    return { ok: false, reason: `${techName}'s hours on ${DAY_NAMES[dow]}s are ${blockStr}. The appointment (${formatTime(startTime)}–${formatTime(endTime)}) falls outside those hours.` };
+  }
+
+  return { ok: true };
+}
+
 document.getElementById("form-appointment").addEventListener("submit", async e => {
   e.preventDefault();
   const startTime = document.getElementById("appt-start-time").value || null;
@@ -2785,6 +2850,25 @@ document.getElementById("form-appointment").addEventListener("submit", async e =
     notes: document.getElementById("appt-notes").value.trim(),
     title: "", recurrence, recurrenceEndDate,
   };
+
+  // ── Availability check ──────────────────────────────────
+  if (base.technicianId) {
+    const dates = recurrence
+      ? generateRecurringDates(base.date, recurrence, recurrenceEndDate)
+      : [base.date];
+    const conflicts = [];
+    for (const date of dates) {
+      const check = checkTechAvailability(base.technicianId, date, startTime, endTime);
+      if (!check.ok) conflicts.push(check.reason);
+    }
+    if (conflicts.length > 0) {
+      const unique = [...new Set(conflicts)];
+      const msg = unique.length === 1
+        ? `Availability conflict:\n\n${unique[0]}\n\nSchedule anyway?`
+        : `Availability conflicts on ${conflicts.length} date(s):\n\n${unique.slice(0, 5).join("\n")}${unique.length > 5 ? `\n\u2026and ${unique.length - 5} more` : ""}\n\nSchedule anyway?`;
+      if (!confirm(msg)) return;
+    }
+  }
   if (state.editingAppointmentId) {
     const idx = state.appointments.findIndex(a => a.id === state.editingAppointmentId);
     if (idx !== -1) {
