@@ -23,6 +23,9 @@ const state = {
   currentTechnicianId: null,
   editingTechnicianId: null,
   returnTo: null, // tracks where to go back from customer detail
+  appointments: [],
+  editingAppointmentId: null,
+  apptContext: null, // "customer" | "technician" | "calendar"
 };
 
 // ── DB Mappers ─────────────────────────────────────────────
@@ -268,6 +271,57 @@ async function dbDeleteTechnician(id) {
   if (error) console.error("Delete technician error:", error);
 }
 
+// ── Appointment Mappers ────────────────────────────────────
+function appointmentFromDb(row) {
+  return {
+    id: row.id,
+    technicianId: row.technician_id || null,
+    customerId: row.customer_id || null,
+    type: row.type,
+    title: row.title || "",
+    notes: row.notes || "",
+    date: row.date,
+    startTime: row.start_time || "",
+    endTime: row.end_time || "",
+    recurrence: row.recurrence || null,
+    recurrenceEndDate: row.recurrence_end_date || null,
+    status: row.status || "scheduled",
+    createdAt: row.created_at,
+  };
+}
+
+function appointmentToDb(a) {
+  return {
+    technician_id: a.technicianId || null,
+    customer_id: a.customerId || null,
+    type: a.type,
+    title: a.title || null,
+    notes: a.notes || null,
+    date: a.date,
+    start_time: a.startTime || null,
+    end_time: a.endTime || null,
+    recurrence: a.recurrence || null,
+    recurrence_end_date: a.recurrenceEndDate || null,
+    status: a.status || "scheduled",
+  };
+}
+
+async function dbInsertAppointment(a) {
+  const { data: row, error } = await sb.from("appointments").insert(appointmentToDb(a)).select().single();
+  if (error) { console.error(error); alert("Error saving appointment: " + error.message); return null; }
+  return appointmentFromDb(row);
+}
+
+async function dbUpdateAppointment(a) {
+  const { error } = await sb.from("appointments").update(appointmentToDb(a)).eq("id", a.id);
+  if (error) console.error("Update appointment error:", error);
+}
+
+async function dbDeleteAppointment(id) {
+  const { error } = await sb.from("appointments").delete().eq("id", id);
+  if (error) console.error("Delete appointment error:", error);
+}
+
 // ── Elements ───────────────────────────────────────────────
 const viewCustomers     = document.getElementById("view-customers");
 const viewDetail        = document.getElementById("view-detail");
@@ -285,11 +339,12 @@ const btnSaveService    = document.getElementById("btn-save-service");
 // ── Init ───────────────────────────────────────────────────
 async function init() {
   customerList.innerHTML = `<div class="empty-state"><p>Loading...</p></div>`;
-  const [custResult, prospResult, globalTasksResult, techResult] = await Promise.all([
+  const [custResult, prospResult, globalTasksResult, techResult, apptResult] = await Promise.all([
     sb.from("customers").select("*").order("created_at", { ascending: false }),
     sb.from("prospects").select("*").order("created_at", { ascending: false }),
     sb.from("global_tasks").select("*").order("category").order("name"),
     sb.from("technicians").select("*").order("last_name"),
+    sb.from("appointments").select("*").order("date").order("start_time"),
   ]);
   if (custResult.error) console.error("Load customers error:", custResult.error);
   if (prospResult.error) console.error("Load prospects error:", prospResult.error);
@@ -297,6 +352,7 @@ async function init() {
   state.prospects = (prospResult.data || []).map(prospectFromDb);
   state.globalTasks = globalTasksResult.data || [];
   state.technicians = (techResult.data || []).map(technicianFromDb);
+  state.appointments = (apptResult.data || []).map(appointmentFromDb);
   // Seed global tasks table if empty (first run)
   if (state.globalTasks.length === 0 && !globalTasksResult.error) {
     const defaults = seedScheduleTasks();
@@ -391,6 +447,7 @@ function openCustomer(id) {
   renderContacts(c);
   renderNotes(c);
   openScheduleForCustomer(id);
+  renderCustomerAppointments(id);
 
   document.getElementById("btn-back").textContent =
     state.returnTo === "technician" ? "← Back to technician" : "← Back to customers";
@@ -745,6 +802,7 @@ document.querySelectorAll(".sidebar__link[data-view]").forEach(link => {
     document.getElementById("view-task-library").style.display = "none";
     document.getElementById("view-technicians").style.display = "none";
     document.getElementById("view-technician-detail").style.display = "none";
+    document.getElementById("view-calendar").style.display = "none";
     if (view === "customers") {
       viewCustomers.style.display = "block";
       renderCustomerList(searchInput.value);
@@ -760,6 +818,10 @@ document.querySelectorAll(".sidebar__link[data-view]").forEach(link => {
     } else if (view === "technicians") {
       document.getElementById("view-technicians").style.display = "block";
       renderTechnicianList();
+    } else if (view === "calendar") {
+      document.getElementById("view-calendar").style.display = "block";
+      state.apptContext = "calendar";
+      openCalendarView();
     }
   });
 });
@@ -861,6 +923,7 @@ function openTechnician(id) {
     });
   }
 
+  renderTechnicianAppointments(id);
   document.getElementById("view-technicians").style.display = "none";
   document.getElementById("view-technician-detail").style.display = "block";
 }
@@ -1932,3 +1995,432 @@ function renderMasterSchedule() {
   }).join("");
 }
 
+// ── Appointment Constants ──────────────────────────────────
+const APPT_TYPE_LABELS = {
+  maintenance: "🔧 Maintenance Visit",
+  consult: "🏠 In-Home Consultation",
+  work_order: "🛠️ Work Order",
+};
+
+// (appointmentToDb, dbInsertAppointment, dbUpdateAppointment, dbDeleteAppointment live at top of file)
+
+function formatTime(t) {
+  if (!t) return "";
+  const [h, m] = t.split(":").map(Number);
+  const suffix = h >= 12 ? "PM" : "AM";
+  return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${suffix}`;
+}
+
+function addMinutesToTime(timeStr, minutes) {
+  if (!timeStr || !minutes) return null;
+  const [h, m] = timeStr.split(":").map(Number);
+  const total = h * 60 + m + parseInt(minutes, 10);
+  return `${String(Math.floor(total / 60) % 24).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+}
+
+function formatApptDate(iso) {
+  if (!iso) return "Unknown Date";
+  const d = new Date(iso + "T12:00:00");
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const diff = Math.round((d - today) / 86400000);
+  const label = d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+  if (diff === 0) return `Today \u2014 ${label}`;
+  if (diff === 1) return `Tomorrow \u2014 ${label}`;
+  if (diff === -1) return `Yesterday \u2014 ${label}`;
+  return label;
+}
+
+function appointmentCardHtml(a, opts = {}) {
+  const tech = a.technicianId ? state.technicians.find(t => t.id === a.technicianId) : null;
+  const cust = a.customerId ? state.customers.find(c => c.id === a.customerId) : null;
+  const typeLabel = APPT_TYPE_LABELS[a.type] || a.type;
+  const timeStr = a.startTime ? formatTime(a.startTime) + (a.endTime ? ` \u2013 ${formatTime(a.endTime)}` : "") : "Time TBD";
+  const statusClass = a.status === "completed" ? "completed" : a.status === "cancelled" ? "cancelled" : "scheduled";
+  return `
+    <div class="appointment-card appt-status--${statusClass}" data-appt-id="${a.id}">
+      <div class="appointment-card__main">
+        <div class="appointment-card__type">${escapeHtml(typeLabel)}</div>
+        <div class="appointment-card__meta">
+          <span>\uD83D\uDD50 ${escapeHtml(timeStr)}</span>
+          ${!opts.hideTech && tech ? `<span>\uD83D\uDD27 ${escapeHtml(tech.firstName)} ${escapeHtml(tech.lastName)}</span>` : ""}
+          ${!opts.hideCust && cust ? `<span>\uD83D\uDC64 <a class="appt-cust-link" data-cust-id="${cust.id}" href="#">${escapeHtml(cust.firstName)} ${escapeHtml(cust.lastName)}</a></span>` : ""}
+          ${a.notes ? `<span class="appt-notes-preview">\uD83D\uDCAC ${escapeHtml(a.notes)}</span>` : ""}
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:0.5rem;flex-shrink:0;">
+        <span class="customer-card__badge badge--${statusClass}">${a.status || "scheduled"}</span>
+        <button class="ghost ghost--small appt-edit-btn" data-appt-id="${a.id}" type="button">Edit</button>
+        <button class="ghost danger icon-btn appt-delete-btn" data-appt-id="${a.id}" type="button">\u2715</button>
+      </div>
+    </div>`;
+}
+
+function bindApptEvents(containerEl) {
+  containerEl.querySelectorAll(".appt-cust-link").forEach(link => {
+    link.addEventListener("click", e => {
+      e.preventDefault();
+      openCustomer(link.dataset.custId);
+    });
+  });
+  containerEl.querySelectorAll(".appt-edit-btn").forEach(btn => {
+    btn.addEventListener("click", () => openEditAppointmentModal(btn.dataset.apptId));
+  });
+  containerEl.querySelectorAll(".appt-delete-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("Delete this appointment?")) return;
+      await dbDeleteAppointment(btn.dataset.apptId);
+      state.appointments = state.appointments.filter(a => a.id !== btn.dataset.apptId);
+      refreshApptContext();
+    });
+  });
+}
+
+function renderAppointmentList(appointments, containerEl, opts = {}) {
+  if (!containerEl) return;
+  if (appointments.length === 0) {
+    containerEl.innerHTML = `<div class="empty-state"><p>No appointments ${opts.past ? "found" : "upcoming"}.</p><p>Click \u201c+ Schedule Appointment\u201d to add one.</p></div>`;
+    return;
+  }
+  const byDate = {};
+  appointments.forEach(a => {
+    if (!byDate[a.date]) byDate[a.date] = [];
+    byDate[a.date].push(a);
+  });
+  const sortedDates = Object.keys(byDate).sort();
+  containerEl.innerHTML = sortedDates.map(date => {
+    const cards = byDate[date]
+      .sort((a, b) => (a.startTime || "99:99").localeCompare(b.startTime || "99:99"))
+      .map(a => appointmentCardHtml(a, opts)).join("");
+    return `<div class="appt-date-group">
+      <div class="appt-date-group__header">${formatApptDate(date)}</div>
+      ${cards}
+    </div>`;
+  }).join("");
+  bindApptEvents(containerEl);
+}
+
+function refreshApptContext() {
+  if (state.apptContext === "customer" && state.currentCustomerId) {
+    renderCustomerAppointments(state.currentCustomerId);
+  } else if (state.apptContext === "technician" && state.currentTechnicianId) {
+    renderTechnicianAppointments(state.currentTechnicianId);
+  } else {
+    renderCalendar();
+  }
+}
+
+function renderCustomerAppointments(customerId) {
+  const containerEl = document.getElementById("customer-appointment-list");
+  if (!containerEl) return;
+  const appts = state.appointments
+    .filter(a => a.customerId === customerId)
+    .sort((a, b) => a.date.localeCompare(b.date) || (a.startTime || "").localeCompare(b.startTime || ""));
+  renderAppointmentList(appts, containerEl, { hideCust: true });
+}
+
+function renderTechnicianAppointments(technicianId) {
+  const containerEl = document.getElementById("technician-appointment-list");
+  if (!containerEl) return;
+  const today = new Date().toISOString().slice(0, 10);
+  const appts = state.appointments
+    .filter(a => a.technicianId === technicianId && a.date >= today)
+    .sort((a, b) => a.date.localeCompare(b.date) || (a.startTime || "").localeCompare(b.startTime || ""));
+  renderAppointmentList(appts, containerEl, { hideTech: true });
+}
+
+
+// ── Calendar View ──────────────────────────────────────────
+function openCalendarView() {
+  populateCalendarTechFilter();
+  renderCalendar();
+}
+
+function populateCalendarTechFilter() {
+  const sel = document.getElementById("calendar-tech-filter");
+  const current = state.calendarTechFilter || "";
+  sel.innerHTML = `<option value="">All Technicians</option>` +
+    state.technicians.filter(t => t.status === "active").map(t =>
+      `<option value="${t.id}"${t.id === current ? " selected" : ""}>${escapeHtml(t.firstName)} ${escapeHtml(t.lastName)}</option>`
+    ).join("");
+}
+
+function getWeekRange(date) {
+  const d = new Date(date);
+  const start = new Date(d);
+  start.setDate(d.getDate() - d.getDay());
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+  return { start, end };
+}
+
+function getCalendarAppts() {
+  const filter = state.calendarTechFilter || "";
+  return state.appointments.filter(a => !filter || a.technicianId === filter);
+}
+
+function renderCalendar() {
+  if (state.calendarView === "month") {
+    renderMonthCalendar();
+  } else {
+    renderWeekCalendar();
+  }
+  const subtitle = document.getElementById("calendar-subtitle");
+  if (subtitle) {
+    if (state.calendarView === "week") {
+      const { start, end } = getWeekRange(state.calendarDate);
+      subtitle.textContent = `${start.toLocaleDateString("en-US", { month: "short", day: "numeric" })} \u2013 ${end.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
+    } else {
+      subtitle.textContent = state.calendarDate.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+    }
+  }
+}
+
+function renderWeekCalendar() {
+  const el = document.getElementById("calendar-grid");
+  if (!el) return;
+  const { start } = getWeekRange(state.calendarDate);
+  const allAppts = getCalendarAppts();
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const cols = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    const dateStr = d.toISOString().slice(0, 10);
+    const dayAppts = allAppts
+      .filter(a => a.date === dateStr)
+      .sort((a, b) => (a.startTime || "").localeCompare(b.startTime || ""));
+    const isToday = dateStr === todayStr;
+    const dayName = d.toLocaleDateString("en-US", { weekday: "short" });
+    const dayNum = d.toLocaleDateString("en-US", { month: "numeric", day: "numeric" });
+    const cards = dayAppts.length
+      ? dayAppts.map(a => appointmentCardHtml(a, {})).join("")
+      : `<div class="cal-empty-day">\u2014</div>`;
+    return `<div class="cal-week-col${isToday ? " cal-week-col--today" : ""}">
+      <div class="cal-week-day-header">
+        <span class="cal-week-day-name">${dayName}</span>
+        <span class="cal-week-day-num">${dayNum}</span>
+      </div>
+      <div class="cal-week-day-body">${cards}</div>
+    </div>`;
+  }).join("");
+  el.innerHTML = `<div class="cal-week-grid">${cols}</div>`;
+  bindApptEvents(el);
+}
+
+function renderMonthCalendar() {
+  const el = document.getElementById("calendar-grid");
+  if (!el) return;
+  const year = state.calendarDate.getFullYear();
+  const month = state.calendarDate.getMonth();
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  const startOffset = firstDay.getDay();
+  const totalCells = Math.ceil((startOffset + lastDay.getDate()) / 7) * 7;
+  const allAppts = getCalendarAppts();
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const apptMap = {};
+  allAppts.forEach(a => {
+    if (!apptMap[a.date]) apptMap[a.date] = [];
+    apptMap[a.date].push(a);
+  });
+  const hdrs = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d => `<div class="cal-month-hdr">${d}</div>`).join("");
+  const cells = Array.from({ length: totalCells }, (_, i) => {
+    const dayNum = i - startOffset + 1;
+    if (dayNum < 1 || dayNum > lastDay.getDate()) return `<div class="cal-month-cell cal-month-cell--out"></div>`;
+    const dateStr = new Date(year, month, dayNum).toISOString().slice(0, 10);
+    const isToday = dateStr === todayStr;
+    const dayAppts = (apptMap[dateStr] || []).sort((a, b) => (a.startTime || "").localeCompare(b.startTime || ""));
+    const pills = dayAppts.slice(0, 3).map(a => {
+      const short = (APPT_TYPE_LABELS[a.type] || a.type).replace(/^\S+\s/, "");
+      return `<div class="cal-pill cal-pill--${escapeHtml(a.type)}" data-appt-id="${a.id}">${a.startTime ? formatTime(a.startTime) + " " : ""}${escapeHtml(short)}</div>`;
+    }).join("") + (dayAppts.length > 3 ? `<div class="cal-pill-more">+${dayAppts.length - 3}</div>` : "");
+    return `<div class="cal-month-cell${isToday ? " cal-month-cell--today" : ""}">
+      <div class="cal-month-cell-num">${dayNum}</div>
+      <div class="cal-month-cell-pills">${pills}</div>
+    </div>`;
+  }).join("");
+  el.innerHTML = `<div class="cal-month-wrap"><div class="cal-month-hdr-row">${hdrs}</div><div class="cal-month-grid">${cells}</div></div>`;
+  el.querySelectorAll(".cal-pill[data-appt-id]").forEach(pill => {
+    pill.addEventListener("click", () => openEditAppointmentModal(pill.dataset.apptId));
+  });
+}
+
+document.getElementById("cal-prev").addEventListener("click", () => {
+  if (state.calendarView === "week") state.calendarDate.setDate(state.calendarDate.getDate() - 7);
+  else state.calendarDate.setMonth(state.calendarDate.getMonth() - 1);
+  state.calendarDate = new Date(state.calendarDate);
+  renderCalendar();
+});
+document.getElementById("cal-today").addEventListener("click", () => {
+  state.calendarDate = new Date();
+  renderCalendar();
+});
+document.getElementById("cal-next").addEventListener("click", () => {
+  if (state.calendarView === "week") state.calendarDate.setDate(state.calendarDate.getDate() + 7);
+  else state.calendarDate.setMonth(state.calendarDate.getMonth() + 1);
+  state.calendarDate = new Date(state.calendarDate);
+  renderCalendar();
+});
+document.getElementById("cal-tab-week").addEventListener("click", () => {
+  state.calendarView = "week";
+  document.getElementById("cal-tab-week").classList.add("pipeline-tab--active");
+  document.getElementById("cal-tab-month").classList.remove("pipeline-tab--active");
+  renderCalendar();
+});
+document.getElementById("cal-tab-month").addEventListener("click", () => {
+  state.calendarView = "month";
+  document.getElementById("cal-tab-month").classList.add("pipeline-tab--active");
+  document.getElementById("cal-tab-week").classList.remove("pipeline-tab--active");
+  renderCalendar();
+});
+document.getElementById("calendar-tech-filter").addEventListener("change", e => {
+  state.calendarTechFilter = e.target.value;
+  renderCalendar();
+});
+
+// ── Recurrence Helper ──────────────────────────────────────
+function generateRecurringDates(startDate, recurrence, endDate) {
+  const dates = [startDate];
+  if (!recurrence || !endDate) return dates;
+  const incrMonths = { monthly: 1, bimonthly: 2, quarterly: 3, biannual: 6, annual: 12 };
+  const incrDays = recurrence === "weekly" ? 7 : null;
+  const mths = incrMonths[recurrence];
+  let current = new Date(startDate + "T12:00:00");
+  const end = new Date(endDate + "T12:00:00");
+  while (true) {
+    const next = new Date(current);
+    if (incrDays) next.setDate(next.getDate() + incrDays);
+    else if (mths) next.setMonth(next.getMonth() + mths);
+    else break;
+    if (next > end) break;
+    dates.push(next.toISOString().slice(0, 10));
+    current = next;
+  }
+  return dates;
+}
+
+function toggleRecurrenceEnd() {
+  const val = document.getElementById("appt-recurrence").value;
+  document.getElementById("appt-recurrence-end-row").style.display = val ? "block" : "none";
+}
+document.getElementById("appt-recurrence").addEventListener("change", toggleRecurrenceEnd);
+
+// ── Appointment Modal ──────────────────────────────────────
+function populateApptDropdowns() {
+  const techSel = document.getElementById("appt-technician");
+  techSel.innerHTML = `<option value="">-- Unassigned --</option>` +
+    state.technicians.filter(t => t.status === "active").map(t =>
+      `<option value="${t.id}">${escapeHtml(t.firstName)} ${escapeHtml(t.lastName)}</option>`
+    ).join("");
+  const custSel = document.getElementById("appt-customer");
+  custSel.innerHTML = `<option value="">-- No customer linked --</option>` +
+    [...state.customers]
+      .sort((a, b) => `${a.lastName}${a.firstName}`.localeCompare(`${b.lastName}${b.firstName}`))
+      .map(c => `<option value="${c.id}">${escapeHtml(c.lastName)}, ${escapeHtml(c.firstName)}${c.customerNumber ? ` (${c.customerNumber})` : ""}</option>`)
+      .join("");
+}
+
+function openAppointmentModal(defaults = {}) {
+  state.editingAppointmentId = null;
+  document.getElementById("modal-appointment-title").textContent = "Schedule Appointment";
+  document.getElementById("btn-delete-appointment").style.display = "none";
+  populateApptDropdowns();
+  document.getElementById("appt-type").value = defaults.type || "maintenance";
+  document.getElementById("appt-status").value = "scheduled";
+  document.getElementById("appt-date").value = defaults.date || new Date().toISOString().slice(0, 10);
+  document.getElementById("appt-start-time").value = defaults.startTime || "09:00";
+  document.getElementById("appt-duration").value = 75;
+  document.getElementById("appt-notes").value = "";
+  document.getElementById("appt-recurrence").value = "";
+  document.getElementById("appt-recurrence-end").value = "";
+  toggleRecurrenceEnd();
+  document.getElementById("appt-technician").value = defaults.technicianId || "";
+  document.getElementById("appt-customer").value = defaults.customerId || "";
+  openModal("modal-appointment");
+}
+
+function openEditAppointmentModal(apptId) {
+  const a = state.appointments.find(x => x.id === apptId);
+  if (!a) return;
+  state.editingAppointmentId = apptId;
+  document.getElementById("modal-appointment-title").textContent = "Edit Appointment";
+  document.getElementById("btn-delete-appointment").style.display = "inline-block";
+  populateApptDropdowns();
+  document.getElementById("appt-type").value = a.type || "maintenance";
+  document.getElementById("appt-status").value = a.status || "scheduled";
+  document.getElementById("appt-date").value = a.date || "";
+  document.getElementById("appt-start-time").value = a.startTime || "";
+  if (a.startTime && a.endTime) {
+    const [sh, sm] = a.startTime.split(":").map(Number);
+    const [eh, em] = a.endTime.split(":").map(Number);
+    document.getElementById("appt-duration").value = (eh * 60 + em) - (sh * 60 + sm);
+  } else {
+    document.getElementById("appt-duration").value = 75;
+  }
+  document.getElementById("appt-notes").value = a.notes || "";
+  document.getElementById("appt-recurrence").value = a.recurrence || "";
+  document.getElementById("appt-recurrence-end").value = a.recurrenceEndDate || "";
+  toggleRecurrenceEnd();
+  document.getElementById("appt-technician").value = a.technicianId || "";
+  document.getElementById("appt-customer").value = a.customerId || "";
+  openModal("modal-appointment");
+}
+
+document.getElementById("form-appointment").addEventListener("submit", async e => {
+  e.preventDefault();
+  const startTime = document.getElementById("appt-start-time").value || null;
+  const duration = parseInt(document.getElementById("appt-duration").value, 10) || 75;
+  const endTime = startTime ? addMinutesToTime(startTime, duration) : null;
+  const recurrence = document.getElementById("appt-recurrence").value || null;
+  const recurrenceEndDate = document.getElementById("appt-recurrence-end").value || null;
+  const base = {
+    type: document.getElementById("appt-type").value,
+    status: document.getElementById("appt-status").value,
+    date: document.getElementById("appt-date").value,
+    startTime, endTime,
+    technicianId: document.getElementById("appt-technician").value || null,
+    customerId: document.getElementById("appt-customer").value || null,
+    notes: document.getElementById("appt-notes").value.trim(),
+    title: "", recurrence, recurrenceEndDate,
+  };
+  if (state.editingAppointmentId) {
+    const idx = state.appointments.findIndex(a => a.id === state.editingAppointmentId);
+    if (idx !== -1) {
+      state.appointments[idx] = { ...state.appointments[idx], ...base };
+      await dbUpdateAppointment(state.appointments[idx]);
+    }
+  } else {
+    const dates = generateRecurringDates(base.date, recurrence, recurrenceEndDate);
+    for (const date of dates) {
+      const saved = await dbInsertAppointment({ ...base, date });
+      if (saved) state.appointments.push(saved);
+    }
+  }
+  closeModal("modal-appointment");
+  refreshApptContext();
+});
+
+document.getElementById("btn-delete-appointment").addEventListener("click", async () => {
+  if (!state.editingAppointmentId || !confirm("Delete this appointment?")) return;
+  await dbDeleteAppointment(state.editingAppointmentId);
+  state.appointments = state.appointments.filter(a => a.id !== state.editingAppointmentId);
+  closeModal("modal-appointment");
+  refreshApptContext();
+});
+
+document.getElementById("btn-add-calendar-appointment").addEventListener("click", () => {
+  state.apptContext = "calendar";
+  openAppointmentModal({});
+});
+
+document.getElementById("btn-add-tech-appointment").addEventListener("click", () => {
+  state.apptContext = "technician";
+  openAppointmentModal({ technicianId: state.currentTechnicianId || "" });
+});
+
+document.getElementById("btn-add-customer-appointment").addEventListener("click", () => {
+  state.apptContext = "customer";
+  const c = getCustomer(state.currentCustomerId);
+  openAppointmentModal({ customerId: state.currentCustomerId || "", technicianId: c?.technicianId || "" });
+});

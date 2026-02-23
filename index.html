@@ -36,6 +36,9 @@
       <a href="#" class="sidebar__link" data-view="technicians">
         <span class="sidebar__icon">🔧</span> Technicians
       </a>
+      <a href="#" class="sidebar__link" data-view="calendar">
+        <span class="sidebar__icon">🗓️</span> Calendar
+      </a>
     </nav>
     <div class="sidebar__footer">
       <div class="sidebar__footer-text">House Hero LLC</div>
@@ -151,6 +154,15 @@
             <div class="empty-state"><p>Loading schedule...</p></div>
           </div>
 
+        </section>
+
+        <!-- Appointments -->
+        <section class="card card--full">
+          <div class="card__header">
+            <h2>Appointments</h2>
+            <button id="btn-add-customer-appointment" type="button" class="ghost ghost--small">+ Schedule Appointment</button>
+          </div>
+          <div id="customer-appointment-list"></div>
         </section>
 
         <!-- Notes -->
@@ -389,7 +401,40 @@
           <div class="card__header"><h2>Assigned Customers</h2></div>
           <div id="technician-assigned-customers"></div>
         </section>
+        <section class="card card--full">
+          <div class="card__header">
+            <h2>Upcoming Appointments</h2>
+            <button id="btn-add-tech-appointment" type="button" class="ghost ghost--small">+ Schedule Appointment</button>
+          </div>
+          <div id="technician-appointment-list"></div>
+        </section>
       </div>
+    </div>
+
+    <!-- Calendar View -->
+    <div id="view-calendar" class="view" style="display:none;">
+      <div class="view__header">
+        <div>
+          <h1 class="view__title">Calendar</h1>
+          <p class="view__subtitle" id="calendar-subtitle">Upcoming appointments</p>
+        </div>
+        <button id="btn-add-calendar-appointment" type="button">+ Schedule Appointment</button>
+      </div>
+      <div class="calendar-controls">
+        <div class="calendar-view-toggle">
+          <button class="pipeline-tab pipeline-tab--active" type="button" id="cal-tab-week">Week</button>
+          <button class="pipeline-tab" type="button" id="cal-tab-month">Month</button>
+        </div>
+        <div class="calendar-nav">
+          <button id="cal-prev" class="ghost ghost--small" type="button">&#8592; Prev</button>
+          <button id="cal-today" class="ghost ghost--small" type="button">Today</button>
+          <button id="cal-next" class="ghost ghost--small" type="button">Next &#8594;</button>
+        </div>
+        <select id="calendar-tech-filter">
+          <option value="">All Technicians</option>
+        </select>
+      </div>
+      <div id="calendar-grid" style="margin-top:1.25rem;"></div>
     </div>
 
   </main>
@@ -775,6 +820,85 @@
         <div class="modal__actions">
           <button type="submit">Save Technician</button>
           <button type="button" class="ghost" data-close="modal-technician">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Add/Edit Appointment -->
+  <div id="modal-appointment" class="modal" style="display:none;">
+    <div class="modal__box">
+      <div class="modal__header">
+        <h2 id="modal-appointment-title">Schedule Appointment</h2>
+        <button class="modal__close" data-close="modal-appointment" type="button">✕</button>
+      </div>
+      <form id="form-appointment">
+        <div class="form-grid">
+          <label>
+            Type
+            <select id="appt-type">
+              <option value="maintenance">🔧 Maintenance Visit</option>
+              <option value="consult">🏠 In-Home Consultation</option>
+              <option value="work_order">🛠️ Work Order</option>
+            </select>
+          </label>
+          <label>
+            Status
+            <select id="appt-status">
+              <option value="scheduled">Scheduled</option>
+              <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </label>
+          <label>
+            Date *
+            <input type="date" id="appt-date" required />
+          </label>
+          <label>
+            Start Time
+            <input type="time" id="appt-start-time" />
+          </label>
+          <label>
+            Duration (minutes)
+            <input type="number" id="appt-duration" min="15" max="480" value="75" />
+          </label>
+          <label>
+            Technician
+            <select id="appt-technician">
+              <option value="">-- Unassigned --</option>
+            </select>
+          </label>
+          <label class="span-2">
+            Customer
+            <select id="appt-customer">
+              <option value="">-- No customer linked --</option>
+            </select>
+          </label>
+          <label class="span-2">
+            Notes
+            <textarea id="appt-notes" rows="3" placeholder="Any notes about this appointment..."></textarea>
+          </label>
+          <label>
+            Repeat
+            <select id="appt-recurrence">
+              <option value="">Does not repeat</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+              <option value="bimonthly">Every 2 Months</option>
+              <option value="quarterly">Quarterly</option>
+              <option value="biannual">Every 6 Months</option>
+              <option value="annual">Annually</option>
+            </select>
+          </label>
+          <label id="appt-recurrence-end-row" style="display:none;">
+            Repeat Until
+            <input type="date" id="appt-recurrence-end" />
+          </label>
+        </div>
+        <div class="modal__actions">
+          <button type="submit">Save Appointment</button>
+          <button type="button" id="btn-delete-appointment" class="ghost danger" style="display:none;">Delete</button>
+          <button type="button" class="ghost" data-close="modal-appointment">Cancel</button>
         </div>
       </form>
     </div>
