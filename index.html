@@ -408,6 +408,21 @@
           </div>
           <div id="technician-appointment-list"></div>
         </section>
+        <section class="card card--full">
+          <div class="card__header">
+            <h2>Weekly Availability</h2>
+            <span style="font-size:0.78rem;color:var(--muted);align-self:center;">Repeats every week — click + Add Hours to set blocks per day</span>
+          </div>
+          <div id="technician-weekly-availability"></div>
+        </section>
+        <section class="card card--full">
+          <div class="card__header">
+            <h2>Date Overrides</h2>
+            <button id="btn-add-avail-override" type="button" class="ghost ghost--small">+ Add Override</button>
+          </div>
+          <p style="font-size:0.8rem;color:var(--muted);margin:0 0 0.5rem;">Override a specific date — e.g. vacation, sick day, or custom hours different from the weekly schedule.</p>
+          <div id="technician-override-list"></div>
+        </section>
       </div>
     </div>
 
@@ -430,11 +445,20 @@
           <button id="cal-today" class="ghost ghost--small" type="button">Today</button>
           <button id="cal-next" class="ghost ghost--small" type="button">Next &#8594;</button>
         </div>
+        <button id="cal-closures-toggle" class="ghost ghost--small" type="button" title="Show/hide company closures">🏢 Closures</button>
         <select id="calendar-tech-filter">
           <option value="">All Technicians</option>
         </select>
       </div>
       <div id="calendar-grid" style="margin-top:1.25rem;"></div>
+      <div class="company-closures-panel" id="company-closures-panel" style="display:none;margin-top:1.5rem;">
+        <div class="card__header" style="margin-bottom:0.5rem;">
+          <h2 style="font-size:1rem;">🏢 Company Closures &amp; Holidays</h2>
+          <button id="btn-add-closure" type="button" class="ghost ghost--small">+ Add Closure</button>
+        </div>
+        <p style="font-size:0.8rem;color:var(--muted);margin:0 0 0.75rem;">Dates when the entire company is closed — affects all technicians.</p>
+        <div id="company-closures-list"></div>
+      </div>
     </div>
 
   </main>
@@ -899,6 +923,48 @@
           <button type="submit">Save Appointment</button>
           <button type="button" id="btn-delete-appointment" class="ghost danger" style="display:none;">Delete</button>
           <button type="button" class="ghost" data-close="modal-appointment">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Availability Override / Company Closure -->
+  <div id="modal-avail-override" class="modal" style="display:none;">
+    <div class="modal__box">
+      <div class="modal__header">
+        <h2 id="modal-avail-override-title">Add Date Override</h2>
+        <button class="modal__close" data-close="modal-avail-override" type="button">✕</button>
+      </div>
+      <form id="form-avail-override">
+        <div class="form-grid">
+          <label>
+            Date *
+            <input type="date" id="ao-date" required />
+          </label>
+          <label id="ao-type-row">
+            Type
+            <select id="ao-type">
+              <option value="day_off">Day Off (unavailable)</option>
+              <option value="custom">Custom Hours</option>
+            </select>
+          </label>
+          <label class="span-2">
+            Note / Name
+            <input type="text" id="ao-note" placeholder='e.g. "Vacation", "Doctor appt", "Thanksgiving"' />
+          </label>
+          <div class="span-2" id="ao-blocks-section" style="display:none;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+              <span style="font-size:0.88rem;font-weight:600;">Available Hours on This Date</span>
+              <button type="button" id="btn-ao-add-block" class="ghost ghost--small">+ Add Block</button>
+            </div>
+            <div id="ao-blocks-list"></div>
+          </div>
+          <input type="hidden" id="ao-tech-id" />
+        </div>
+        <div class="modal__actions">
+          <button type="submit">Save</button>
+          <button type="button" id="btn-delete-avail-override" class="ghost danger" style="display:none;">Delete</button>
+          <button type="button" class="ghost" data-close="modal-avail-override">Cancel</button>
         </div>
       </form>
     </div>

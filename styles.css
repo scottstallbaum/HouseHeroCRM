@@ -1462,3 +1462,217 @@ textarea::placeholder {
   color: var(--muted);
   padding: 0 0.3rem;
 }
+
+/* ── Availability Weekly Grid ────────────────────── */
+.avail-week-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.avail-day-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.55rem 0.5rem;
+  border-bottom: 1px solid var(--stroke);
+  flex-wrap: wrap;
+}
+
+.avail-day-row:last-child {
+  border-bottom: none;
+}
+
+.avail-day-name {
+  font-weight: 700;
+  font-size: 0.85rem;
+  min-width: 80px;
+  flex-shrink: 0;
+}
+
+.avail-day-name--off {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.avail-day-blocks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  flex: 1;
+  align-items: center;
+}
+
+.avail-block-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: #dbeafe;
+  color: #1e3a5f;
+  border-radius: 20px;
+  padding: 0.2rem 0.6rem 0.2rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.avail-block-del {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #1e3a5f;
+  font-size: 0.9rem;
+  opacity: 0.6;
+  padding: 0 0.1rem;
+  line-height: 1;
+}
+
+.avail-block-del:hover {
+  opacity: 1;
+}
+
+.avail-off-label {
+  font-size: 0.8rem;
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* Inline add-block form */
+.avail-inline-form {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 0.5rem;
+  background: var(--bg);
+  border-bottom: 1px solid var(--stroke);
+  border-left: 3px solid var(--accent);
+  flex-wrap: wrap;
+}
+
+.avail-inline-label {
+  font-size: 0.8rem;
+  color: var(--muted);
+  min-width: 80px;
+}
+
+.avail-inline-sep {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.avail-inline-form input[type="time"] {
+  padding: 0.3rem 0.5rem;
+  font-size: 0.85rem;
+  border: 1px solid var(--stroke);
+  border-radius: 6px;
+  background: var(--card);
+  color: var(--text);
+}
+
+.avail-inline-save {
+  padding: 0.3rem 0.75rem;
+  font-size: 0.8rem;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.avail-inline-save:hover {
+  opacity: 0.88;
+}
+
+/* ── Availability Overrides + Closures ───────────── */
+.override-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.override-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.55rem 0.5rem;
+  border-bottom: 1px solid var(--stroke);
+}
+
+.override-row:last-child {
+  border-bottom: none;
+}
+
+.override-row__info {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  flex: 1;
+}
+
+.override-row__date {
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.override-row__actions {
+  display: flex;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.override-note {
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.override-badge {
+  display: inline-block;
+  padding: 0.15rem 0.55rem;
+  border-radius: 20px;
+  font-size: 0.73rem;
+  font-weight: 600;
+}
+
+.override-badge--off {
+  background: #fee2e2;
+  color: #7f1d1d;
+}
+
+.override-badge--custom {
+  background: #d1fae5;
+  color: #064e3b;
+}
+
+.override-badge--closed {
+  background: #fef3c7;
+  color: #78350f;
+}
+
+/* ── Availability Override Modal blocks ─────────── */
+.ao-block-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.ao-block-row input[type="time"] {
+  padding: 0.3rem 0.5rem;
+  font-size: 0.85rem;
+  border: 1px solid var(--stroke);
+  border-radius: 6px;
+  background: var(--card);
+  color: var(--text);
+}
+
+/* ── Company Closures Panel ──────────────────────── */
+.company-closures-panel {
+  background: var(--card);
+  border: 1px solid var(--stroke);
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+}

@@ -29,6 +29,10 @@ const state = {
   calendarView: "week",
   calendarDate: new Date(),
   calendarTechFilter: "",
+  weeklyAvailability: [],       // { id, technicianId, dayOfWeek, startTime, endTime }
+  availabilityOverrides: [],    // { id, technicianId(null=company), date, isDayOff, blocks, note }
+  editingOverrideId: null,
+  overrideContext: null,         // "technician" | "company"
 };
 
 // ── DB Mappers ─────────────────────────────────────────────
@@ -325,6 +329,73 @@ async function dbDeleteAppointment(id) {
   if (error) console.error("Delete appointment error:", error);
 }
 
+// ── Availability Mappers ───────────────────────────────────
+function weeklyAvailFromDb(row) {
+  return {
+    id: row.id,
+    technicianId: row.technician_id,
+    dayOfWeek: row.day_of_week,
+    startTime: row.start_time,
+    endTime: row.end_time,
+  };
+}
+
+function overrideFromDb(row) {
+  return {
+    id: row.id,
+    technicianId: row.technician_id || null,
+    date: row.date,
+    isDayOff: row.is_day_off,
+    blocks: row.blocks || [],
+    note: row.note || "",
+    createdAt: row.created_at,
+  };
+}
+
+// ── Availability DB Functions ──────────────────────────────
+async function dbInsertWeeklyAvail(item) {
+  const { data: row, error } = await sb.from("technician_weekly_availability").insert({
+    technician_id: item.technicianId,
+    day_of_week: item.dayOfWeek,
+    start_time: item.startTime,
+    end_time: item.endTime,
+  }).select().single();
+  if (error) { console.error(error); alert("Error saving availability: " + error.message); return null; }
+  return weeklyAvailFromDb(row);
+}
+
+async function dbDeleteWeeklyAvail(id) {
+  const { error } = await sb.from("technician_weekly_availability").delete().eq("id", id);
+  if (error) console.error("Delete weekly avail error:", error);
+}
+
+async function dbInsertOverride(item) {
+  const { data: row, error } = await sb.from("availability_overrides").insert({
+    technician_id: item.technicianId || null,
+    date: item.date,
+    is_day_off: item.isDayOff,
+    blocks: item.blocks || [],
+    note: item.note || null,
+  }).select().single();
+  if (error) { console.error(error); alert("Error saving override: " + error.message); return null; }
+  return overrideFromDb(row);
+}
+
+async function dbUpdateOverride(item) {
+  const { error } = await sb.from("availability_overrides").update({
+    date: item.date,
+    is_day_off: item.isDayOff,
+    blocks: item.blocks || [],
+    note: item.note || null,
+  }).eq("id", item.id);
+  if (error) console.error("Update override error:", error);
+}
+
+async function dbDeleteOverride(id) {
+  const { error } = await sb.from("availability_overrides").delete().eq("id", id);
+  if (error) console.error("Delete override error:", error);
+}
+
 // ── Elements ───────────────────────────────────────────────
 const viewCustomers     = document.getElementById("view-customers");
 const viewDetail        = document.getElementById("view-detail");
@@ -342,12 +413,14 @@ const btnSaveService    = document.getElementById("btn-save-service");
 // ── Init ───────────────────────────────────────────────────
 async function init() {
   customerList.innerHTML = `<div class="empty-state"><p>Loading...</p></div>`;
-  const [custResult, prospResult, globalTasksResult, techResult, apptResult] = await Promise.all([
+  const [custResult, prospResult, globalTasksResult, techResult, apptResult, weeklyAvailResult, overrideResult] = await Promise.all([
     sb.from("customers").select("*").order("created_at", { ascending: false }),
     sb.from("prospects").select("*").order("created_at", { ascending: false }),
     sb.from("global_tasks").select("*").order("category").order("name"),
     sb.from("technicians").select("*").order("last_name"),
     sb.from("appointments").select("*").order("date").order("start_time"),
+    sb.from("technician_weekly_availability").select("*").order("day_of_week").order("start_time"),
+    sb.from("availability_overrides").select("*").order("date"),
   ]);
   if (custResult.error) console.error("Load customers error:", custResult.error);
   if (prospResult.error) console.error("Load prospects error:", prospResult.error);
@@ -356,6 +429,8 @@ async function init() {
   state.globalTasks = globalTasksResult.data || [];
   state.technicians = (techResult.data || []).map(technicianFromDb);
   state.appointments = (apptResult.data || []).map(appointmentFromDb);
+  state.weeklyAvailability = (weeklyAvailResult.data || []).map(weeklyAvailFromDb);
+  state.availabilityOverrides = (overrideResult.data || []).map(overrideFromDb);
   // Seed global tasks table if empty (first run)
   if (state.globalTasks.length === 0 && !globalTasksResult.error) {
     const defaults = seedScheduleTasks();
@@ -927,6 +1002,7 @@ function openTechnician(id) {
   }
 
   renderTechnicianAppointments(id);
+  renderTechnicianAvailability(id);
   document.getElementById("view-technicians").style.display = "none";
   document.getElementById("view-technician-detail").style.display = "block";
 }
@@ -2148,10 +2224,315 @@ function renderTechnicianAppointments(technicianId) {
 }
 
 
+// ── Availability ───────────────────────────────────────────
+const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+function renderTechnicianAvailability(techId) {
+  const weeklyEl = document.getElementById("technician-weekly-availability");
+  const overrideEl = document.getElementById("technician-override-list");
+  if (!weeklyEl || !overrideEl) return;
+
+  const techBlocks = state.weeklyAvailability
+    .filter(b => b.technicianId === techId)
+    .sort((a, b) => a.dayOfWeek - b.dayOfWeek || a.startTime.localeCompare(b.startTime));
+
+  let gridHtml = `<div class="avail-week-grid">`;
+  for (let d = 0; d < 7; d++) {
+    const dayBlocks = techBlocks.filter(b => b.dayOfWeek === d);
+    const isEmpty = dayBlocks.length === 0;
+    const blockHtml = dayBlocks.map(b => `
+      <span class="avail-block-tag">
+        <span>${formatTime(b.startTime)} \u2013 ${formatTime(b.endTime)}</span>
+        <button type="button" class="btn-avail-del-block avail-block-del" data-id="${b.id}" title="Remove">&times;</button>
+      </span>`).join("");
+    gridHtml += `
+      <div class="avail-day-row" data-day="${d}" id="avail-day-${d}">
+        <span class="avail-day-name${isEmpty ? " avail-day-name--off" : ""}">${DAY_NAMES[d]}</span>
+        <div class="avail-day-blocks">
+          ${isEmpty ? '<span class="avail-off-label">Not scheduled</span>' : blockHtml}
+        </div>
+        <button type="button" class="btn-avail-add-block ghost ghost--small" data-day="${d}" data-tech="${techId}">+ Add Hours</button>
+      </div>`;
+  }
+  gridHtml += `</div>`;
+  weeklyEl.innerHTML = gridHtml;
+
+  weeklyEl.querySelectorAll(".btn-avail-del-block").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      btn.disabled = true;
+      await dbDeleteWeeklyAvail(btn.dataset.id);
+      state.weeklyAvailability = state.weeklyAvailability.filter(b => b.id !== btn.dataset.id);
+      renderTechnicianAvailability(techId);
+    });
+  });
+
+  weeklyEl.querySelectorAll(".btn-avail-add-block").forEach(btn => {
+    btn.addEventListener("click", () => showInlineBlockForm(weeklyEl, parseInt(btn.dataset.day), techId));
+  });
+
+  // Overrides list
+  const techOverrides = state.availabilityOverrides
+    .filter(o => o.technicianId === techId)
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  if (techOverrides.length === 0) {
+    overrideEl.innerHTML = `<div class="empty-state" style="padding:0.5rem 0;"><p>No date overrides yet.</p></div>`;
+  } else {
+    overrideEl.innerHTML = `<div class="override-list">${techOverrides.map(o => overrideRowHtml(o)).join("")}</div>`;
+    overrideEl.querySelectorAll(".btn-edit-override").forEach(btn => {
+      btn.addEventListener("click", () => openAvailOverrideModal({ id: btn.dataset.id, technicianId: techId }));
+    });
+    overrideEl.querySelectorAll(".btn-del-override").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        if (!confirm("Delete this date override?")) return;
+        await dbDeleteOverride(btn.dataset.id);
+        state.availabilityOverrides = state.availabilityOverrides.filter(o => o.id !== btn.dataset.id);
+        renderTechnicianAvailability(techId);
+      });
+    });
+  }
+}
+
+function showInlineBlockForm(container, dayNum, techId) {
+  const existing = container.querySelector(".avail-inline-form");
+  if (existing) existing.remove();
+  const row = container.querySelector(`.avail-day-row[data-day="${dayNum}"]`);
+  if (!row) return;
+
+  // Suggest a start time after the last existing block on this day
+  let defStart = "08:00", defEnd = "17:00";
+  const dayBlocks = state.weeklyAvailability
+    .filter(b => b.technicianId === techId && b.dayOfWeek === dayNum)
+    .sort((a, b) => a.endTime.localeCompare(b.endTime));
+  if (dayBlocks.length) {
+    const [h, m] = dayBlocks[dayBlocks.length - 1].endTime.split(":").map(Number);
+    const newH = Math.min(h + 1, 22);
+    defStart = `${String(newH).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+    defEnd = `${String(Math.min(newH + 4, 23)).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+  }
+
+  row.insertAdjacentHTML("afterend", `
+    <div class="avail-inline-form" data-day="${dayNum}">
+      <span class="avail-inline-label">${DAY_NAMES[dayNum]}</span>
+      <input type="time" class="avail-inline-start" value="${defStart}" />
+      <span class="avail-inline-sep">–</span>
+      <input type="time" class="avail-inline-end" value="${defEnd}" />
+      <button type="button" class="avail-inline-save">Save</button>
+      <button type="button" class="avail-inline-cancel ghost ghost--small">Cancel</button>
+    </div>`);
+
+  const form = container.querySelector(".avail-inline-form");
+  form.querySelector(".avail-inline-save").addEventListener("click", async () => {
+    const startTime = form.querySelector(".avail-inline-start").value;
+    const endTime = form.querySelector(".avail-inline-end").value;
+    if (!startTime || !endTime) { alert("Please enter start and end times."); return; }
+    if (startTime >= endTime) { alert("End time must be after start time."); return; }
+    form.querySelector(".avail-inline-save").disabled = true;
+    const newBlock = await dbInsertWeeklyAvail({ technicianId: techId, dayOfWeek: dayNum, startTime, endTime });
+    if (newBlock) {
+      state.weeklyAvailability.push(newBlock);
+      renderTechnicianAvailability(techId);
+    }
+  });
+  form.querySelector(".avail-inline-cancel").addEventListener("click", () => form.remove());
+}
+
+function overrideRowHtml(o) {
+  const [y, mo, d] = o.date.split("-");
+  const displayDate = new Date(parseInt(y), parseInt(mo) - 1, parseInt(d))
+    .toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+  let detail = o.isDayOff
+    ? `<span class="override-badge override-badge--off">Day Off</span>`
+    : `<span class="override-badge override-badge--custom">Custom: ${(o.blocks || []).map(b => `${formatTime(b.start)} \u2013 ${formatTime(b.end)}`).join(", ") || "No blocks"}</span>`;
+  const noteHtml = o.note ? `<span class="override-note">${escapeHtml(o.note)}</span>` : "";
+  return `
+    <div class="override-row">
+      <div class="override-row__info">
+        <span class="override-row__date">${displayDate}</span>
+        ${detail}${noteHtml}
+      </div>
+      <div class="override-row__actions">
+        <button type="button" class="ghost ghost--small btn-edit-override" data-id="${o.id}">Edit</button>
+        <button type="button" class="ghost ghost--small danger btn-del-override" data-id="${o.id}">&times;</button>
+      </div>
+    </div>`;
+}
+
+function closureRowHtml(o) {
+  const [y, mo, d] = o.date.split("-");
+  const displayDate = new Date(parseInt(y), parseInt(mo) - 1, parseInt(d))
+    .toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+  const noteHtml = o.note ? `<span class="override-note">${escapeHtml(o.note)}</span>` : "";
+  return `
+    <div class="override-row">
+      <div class="override-row__info">
+        <span class="override-row__date">${displayDate}</span>
+        <span class="override-badge override-badge--closed">Closed</span>
+        ${noteHtml}
+      </div>
+      <div class="override-row__actions">
+        <button type="button" class="ghost ghost--small btn-edit-closure" data-id="${o.id}">Edit</button>
+        <button type="button" class="ghost ghost--small danger btn-del-closure" data-id="${o.id}">&times;</button>
+      </div>
+    </div>`;
+}
+
+function renderCompanyClosures() {
+  const el = document.getElementById("company-closures-list");
+  if (!el) return;
+  const closures = state.availabilityOverrides
+    .filter(o => o.technicianId === null)
+    .sort((a, b) => a.date.localeCompare(b.date));
+  if (closures.length === 0) {
+    el.innerHTML = `<div class="empty-state" style="padding:0.5rem 0;"><p>No company closures defined yet.</p></div>`;
+  } else {
+    el.innerHTML = `<div class="override-list">${closures.map(o => closureRowHtml(o)).join("")}</div>`;
+    el.querySelectorAll(".btn-edit-closure").forEach(btn => {
+      btn.addEventListener("click", () => openAvailOverrideModal({ id: btn.dataset.id, isCompany: true }));
+    });
+    el.querySelectorAll(".btn-del-closure").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        if (!confirm("Delete this company closure?")) return;
+        await dbDeleteOverride(btn.dataset.id);
+        state.availabilityOverrides = state.availabilityOverrides.filter(o => o.id !== btn.dataset.id);
+        renderCompanyClosures();
+      });
+    });
+  }
+}
+
+function openAvailOverrideModal(opts = {}) {
+  state.editingOverrideId = opts.id || null;
+  state.overrideContext = opts.isCompany ? "company" : "technician";
+  const existing = opts.id ? state.availabilityOverrides.find(o => o.id === opts.id) : null;
+  const isCompany = !!opts.isCompany;
+
+  document.getElementById("modal-avail-override-title").textContent =
+    opts.id
+      ? (isCompany ? "Edit Company Closure" : "Edit Date Override")
+      : (isCompany ? "Add Company Closure" : "Add Date Override");
+
+  document.getElementById("ao-date").value = existing?.date || "";
+  document.getElementById("ao-type").value = (existing && !existing.isDayOff) ? "custom" : "day_off";
+  document.getElementById("ao-note").value = existing?.note || "";
+  document.getElementById("ao-tech-id").value = isCompany ? "" : (opts.technicianId || existing?.technicianId || "");
+
+  // Company closures always "day off" — hide type selector
+  document.getElementById("ao-type-row").style.display = isCompany ? "none" : "";
+  if (isCompany) document.getElementById("ao-type").value = "day_off";
+
+  toggleAoBlocksSection();
+
+  // Populate blocks
+  const blocksList = document.getElementById("ao-blocks-list");
+  blocksList.innerHTML = "";
+  (existing?.blocks || []).forEach(b => addAoBlockRow(b.start, b.end));
+
+  const deleteBtn = document.getElementById("btn-delete-avail-override");
+  deleteBtn.style.display = opts.id ? "" : "none";
+
+  document.getElementById("modal-avail-override").style.display = "flex";
+}
+
+function toggleAoBlocksSection() {
+  const type = document.getElementById("ao-type").value;
+  const section = document.getElementById("ao-blocks-section");
+  section.style.display = type === "custom" ? "" : "none";
+  if (type === "custom" && document.getElementById("ao-blocks-list").childElementCount === 0) {
+    addAoBlockRow("08:00", "17:00");
+  }
+}
+
+function addAoBlockRow(start = "08:00", end = "17:00") {
+  const list = document.getElementById("ao-blocks-list");
+  const row = document.createElement("div");
+  row.className = "ao-block-row";
+  row.innerHTML = `
+    <input type="time" class="ao-block-start" value="${start}" />
+    <span class="avail-inline-sep">–</span>
+    <input type="time" class="ao-block-end" value="${end}" />
+    <button type="button" class="ghost ghost--small ao-block-del" title="Remove">&times;</button>`;
+  row.querySelector(".ao-block-del").addEventListener("click", () => row.remove());
+  list.appendChild(row);
+}
+
+document.getElementById("ao-type").addEventListener("change", toggleAoBlocksSection);
+document.getElementById("btn-ao-add-block").addEventListener("click", () => addAoBlockRow());
+
+document.getElementById("form-avail-override").addEventListener("submit", async e => {
+  e.preventDefault();
+  const date = document.getElementById("ao-date").value;
+  const type = document.getElementById("ao-type").value;
+  const note = document.getElementById("ao-note").value.trim();
+  const technicianId = document.getElementById("ao-tech-id").value || null;
+  const isDayOff = type !== "custom";
+
+  let blocks = [];
+  if (!isDayOff) {
+    blocks = [...document.querySelectorAll("#ao-blocks-list .ao-block-row")].map(r => ({
+      start: r.querySelector(".ao-block-start").value,
+      end: r.querySelector(".ao-block-end").value,
+    })).filter(b => b.start && b.end && b.start < b.end);
+    if (blocks.length === 0) { alert("Please add at least one valid time block."); return; }
+  }
+
+  const submitBtn = e.target.querySelector("[type=submit]");
+  submitBtn.disabled = true;
+  const item = { date, isDayOff, blocks, note, technicianId };
+
+  if (state.editingOverrideId) {
+    item.id = state.editingOverrideId;
+    await dbUpdateOverride(item);
+    const idx = state.availabilityOverrides.findIndex(o => o.id === state.editingOverrideId);
+    if (idx >= 0) state.availabilityOverrides[idx] = { ...state.availabilityOverrides[idx], ...item };
+  } else {
+    const saved = await dbInsertOverride(item);
+    if (saved) state.availabilityOverrides.push(saved);
+  }
+
+  submitBtn.disabled = false;
+  closeModal("modal-avail-override");
+  if (state.overrideContext === "company") {
+    renderCompanyClosures();
+  } else if (state.currentTechnicianId) {
+    renderTechnicianAvailability(state.currentTechnicianId);
+  }
+});
+
+document.getElementById("btn-delete-avail-override").addEventListener("click", async () => {
+  if (!state.editingOverrideId || !confirm("Delete this override?")) return;
+  await dbDeleteOverride(state.editingOverrideId);
+  state.availabilityOverrides = state.availabilityOverrides.filter(o => o.id !== state.editingOverrideId);
+  closeModal("modal-avail-override");
+  if (state.overrideContext === "company") {
+    renderCompanyClosures();
+  } else if (state.currentTechnicianId) {
+    renderTechnicianAvailability(state.currentTechnicianId);
+  }
+});
+
+document.getElementById("btn-add-avail-override").addEventListener("click", () => {
+  openAvailOverrideModal({ technicianId: state.currentTechnicianId });
+});
+
+document.getElementById("btn-add-closure").addEventListener("click", () => {
+  openAvailOverrideModal({ isCompany: true });
+});
+
+document.getElementById("cal-closures-toggle").addEventListener("click", () => {
+  const panel = document.getElementById("company-closures-panel");
+  const visible = panel.style.display !== "none";
+  panel.style.display = visible ? "none" : "";
+  if (!visible) renderCompanyClosures();
+});
+
 // ── Calendar View ──────────────────────────────────────────
 function openCalendarView() {
   populateCalendarTechFilter();
   renderCalendar();
+  // Refresh closures list if panel is open
+  const panel = document.getElementById("company-closures-panel");
+  if (panel && panel.style.display !== "none") renderCompanyClosures();
 }
 
 function populateCalendarTechFilter() {
