@@ -1087,7 +1087,7 @@ textarea::placeholder {
 .master-sched-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   margin-bottom: 0.6rem;
 }
 
@@ -1095,6 +1095,17 @@ textarea::placeholder {
   font-family: "Fraunces", Georgia, serif;
   font-size: 1rem;
   font-weight: 700;
+}
+
+.master-sched-tech {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin-top: 0.15rem;
+  display: block;
+}
+
+.master-sched-tech--unassigned {
+  font-style: italic;
 }
 
 .master-sched-total {

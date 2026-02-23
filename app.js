@@ -2062,9 +2062,16 @@ function renderMasterSchedule() {
   listEl.innerHTML = entries.map(({ c, tasks, total, limit }) => {
     const overClass = total > limit ? "schedule-total--over" : "";
     const addr = getFullAddress(c);
+    const tech = c.technicianId ? state.technicians.find(t => t.id === c.technicianId) : null;
+    const techHtml = tech
+      ? `<span class="master-sched-tech">🔧 ${escapeHtml(tech.firstName)} ${escapeHtml(tech.lastName)}</span>`
+      : `<span class="master-sched-tech master-sched-tech--unassigned">Unassigned</span>`;
     return `<div class="master-sched-card">
       <div class="master-sched-header">
-        <span class="master-sched-name">${escapeHtml(c.firstName)} ${escapeHtml(c.lastName)}${addr ? `<span style="font-weight:400;font-size:0.82rem;color:var(--muted);margin-left:0.5rem;">${escapeHtml(addr)}</span>` : ""}</span>
+        <div>
+          <span class="master-sched-name">${escapeHtml(c.firstName)} ${escapeHtml(c.lastName)}${addr ? `<span style="font-weight:400;font-size:0.82rem;color:var(--muted);margin-left:0.5rem;">${escapeHtml(addr)}</span>` : ""}</span>
+          ${techHtml}
+        </div>
         <span class="master-sched-total ${overClass}">${total} / ${limit}m</span>
       </div>
       <ul class="master-sched-tasks">
