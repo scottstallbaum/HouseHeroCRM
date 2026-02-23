@@ -638,6 +638,34 @@ textarea {
   color: white;
 }
 
+/* ── Technician Assigned Customer Rows ───────── */
+.tech-customer-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius);
+  margin-bottom: 0.5rem;
+  background: var(--panel);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.tech-customer-row:hover {
+  background: var(--accent-light);
+  border-color: var(--accent-2);
+}
+.tech-customer-row__name {
+  font-weight: 700;
+  font-size: 0.95rem;
+  margin-bottom: 0.2rem;
+}
+.tech-customer-row__arrow {
+  font-size: 1.4rem;
+  color: var(--muted);
+  line-height: 1;
+}
+
 /* ── Follow-Up Sections ──────────────────────── */
 .followup-section {
   margin-bottom: 1.5rem;

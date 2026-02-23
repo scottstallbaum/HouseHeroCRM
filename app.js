@@ -22,6 +22,7 @@ const state = {
   technicians: [],
   currentTechnicianId: null,
   editingTechnicianId: null,
+  returnTo: null, // tracks where to go back from customer detail
 };
 
 // ── DB Mappers ─────────────────────────────────────────────
@@ -389,15 +390,24 @@ function openCustomer(id) {
   renderNotes(c);
   openScheduleForCustomer(id);
 
+  document.getElementById("btn-back").textContent =
+    state.returnTo === "technician" ? "← Back to technician" : "← Back to customers";
+
   viewCustomers.style.display = "none";
   viewDetail.style.display = "block";
 }
 
 btnBack.addEventListener("click", () => {
   viewDetail.style.display = "none";
-  viewCustomers.style.display = "block";
   state.currentCustomerId = null;
-  renderCustomerList(searchInput.value);
+  if (state.returnTo === "technician") {
+    state.returnTo = null;
+    document.getElementById("view-technician-detail").style.display = "block";
+  } else {
+    state.returnTo = null;
+    viewCustomers.style.display = "block";
+    renderCustomerList(searchInput.value);
+  }
 });
 
 // ── Account Holders ────────────────────────────────────────
@@ -817,6 +827,37 @@ function openTechnician(id) {
       <span class="prospect-contact-info__label">Status</span>
       <span><span class="customer-card__badge badge--${t.status}">${t.status}</span></span>
     </div>`;
+
+  // Assigned customers list
+  const assigned = state.customers.filter(c => c.technicianId === id)
+    .sort((a, b) => `${a.lastName}${a.firstName}`.localeCompare(`${b.lastName}${b.firstName}`));
+  const assignedEl = document.getElementById("technician-assigned-customers");
+  if (assigned.length === 0) {
+    assignedEl.innerHTML = `<div class="empty-state"><p>No customers assigned yet.</p></div>`;
+  } else {
+    assignedEl.innerHTML = assigned.map(c => `
+      <div class="tech-customer-row" data-id="${c.id}">
+        <div>
+          <div class="tech-customer-row__name">${escapeHtml(c.firstName)} ${escapeHtml(c.lastName)}</div>
+          <div class="customer-card__meta">
+            ${getFullAddress(c) ? `<span>&#128205; ${escapeHtml(getFullAddress(c))}</span>` : ""}
+            ${c.phone ? `<span>&#128222; ${escapeHtml(c.phone)}</span>` : ""}
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.75rem;">
+          ${c.customerNumber ? `<span class="customer-number-badge">${escapeHtml(c.customerNumber)}</span>` : ""}
+          <span class="customer-card__badge badge--${c.status || "active"}">${c.status || "active"}</span>
+          <span class="tech-customer-row__arrow">&rsaquo;</span>
+        </div>
+      </div>`).join("");
+    assignedEl.querySelectorAll(".tech-customer-row").forEach(el => {
+      el.addEventListener("click", () => {
+        state.returnTo = "technician";
+        document.getElementById("view-technician-detail").style.display = "none";
+        openCustomer(el.dataset.id);
+      });
+    });
+  }
 
   document.getElementById("view-technicians").style.display = "none";
   document.getElementById("view-technician-detail").style.display = "block";
