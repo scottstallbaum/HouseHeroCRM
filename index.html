@@ -163,12 +163,14 @@
           <h1 class="view__title">Prospects</h1>
           <p class="view__subtitle" id="prospect-count">Loading...</p>
         </div>
-        <button id="btn-add-prospect" type="button">+ Add Prospect</button>
+        <div style="display:flex;flex-direction:column;gap:0.5rem;align-items:flex-end;">
+          <button id="btn-add-prospect" type="button">+ Add Prospect</button>
+          <button id="btn-followups-due" type="button">📅 Follow-Ups Due</button>
+        </div>
       </div>
 
       <div class="pipeline-tabs" id="pipeline-tabs">
         <button class="pipeline-tab pipeline-tab--active" data-stage="all" type="button">All</button>
-        <button class="pipeline-tab pipeline-tab--followups" data-stage="followups" type="button">📅 Follow-Ups Due</button>
         <button class="pipeline-tab" data-stage="new" type="button">New Lead</button>
         <button class="pipeline-tab" data-stage="contacted" type="button">Contacted</button>
         <button class="pipeline-tab" data-stage="follow-up" type="button">Follow-up</button>

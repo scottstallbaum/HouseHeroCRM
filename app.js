@@ -698,7 +698,15 @@ document.getElementById("pipeline-tabs").addEventListener("click", e => {
   if (!tab) return;
   document.querySelectorAll(".pipeline-tab").forEach(t => t.classList.remove("pipeline-tab--active"));
   tab.classList.add("pipeline-tab--active");
+  document.getElementById("btn-followups-due").classList.remove("btn--active");
   state.activePipelineStage = tab.dataset.stage;
+  renderProspectList();
+});
+
+document.getElementById("btn-followups-due").addEventListener("click", () => {
+  document.querySelectorAll(".pipeline-tab").forEach(t => t.classList.remove("pipeline-tab--active"));
+  document.getElementById("btn-followups-due").classList.add("btn--active");
+  state.activePipelineStage = "followups";
   renderProspectList();
 });
 
