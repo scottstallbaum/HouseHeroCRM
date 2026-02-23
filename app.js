@@ -26,6 +26,9 @@ const state = {
   appointments: [],
   editingAppointmentId: null,
   apptContext: null, // "customer" | "technician" | "calendar"
+  calendarView: "week",
+  calendarDate: new Date(),
+  calendarTechFilter: "",
 };
 
 // ── DB Mappers ─────────────────────────────────────────────
