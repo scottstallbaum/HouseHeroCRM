@@ -490,6 +490,11 @@ textarea {
 
 .span-2 { grid-column: 1 / -1; }
 
+input::placeholder,
+textarea::placeholder {
+  color: #c8c0b4;
+}
+
 /* ── Modal ───────────────────────────────────── */
 .modal {
   position: fixed;
@@ -556,6 +561,17 @@ textarea {
 }
 
 .customer-card__rel {
+  font-style: italic;
+}
+
+.detail-secondary-name {
+  font-size: 0.85em;
+  font-weight: 400;
+  color: var(--muted);
+  margin-left: 0.15em;
+}
+
+.detail-secondary-rel {
   font-style: italic;
 }
 

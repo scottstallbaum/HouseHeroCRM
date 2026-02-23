@@ -621,6 +621,40 @@
             <input type="date" id="prospect-form-followup" />
           </label>
         </div>
+
+        <div class="form-section-divider">
+          <span>Secondary Account Holder <em>(optional)</em></span>
+        </div>
+        <div class="form-grid">
+          <label>
+            First Name
+            <input type="text" id="prospect-second-first" placeholder="John" />
+          </label>
+          <label>
+            Last Name
+            <input type="text" id="prospect-second-last" placeholder="Doe" />
+          </label>
+          <label>
+            Relationship
+            <select id="prospect-second-rel">
+              <option value="">-- Select --</option>
+              <option value="spouse">Spouse</option>
+              <option value="parent">Parent</option>
+              <option value="child">Child</option>
+              <option value="roommate">Roommate</option>
+              <option value="landlord">Landlord</option>
+            </select>
+          </label>
+          <label>
+            Phone
+            <input type="tel" id="prospect-second-phone" placeholder="(570) 555-5678" />
+          </label>
+          <label class="span-2">
+            Email
+            <input type="email" id="prospect-second-email" placeholder="john@email.com" />
+          </label>
+        </div>
+
         <div class="modal__actions">
           <button type="submit">Save Prospect</button>
           <button type="button" class="ghost" data-close="modal-prospect">Cancel</button>

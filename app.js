@@ -86,6 +86,7 @@ function prospectFromDb(row) {
     source: row.source || "",
     lastContactDate: row.last_contact_date || "",
     followUpDate: row.follow_up_date || "",
+    secondary: row.secondary || null,
     notes: row.notes || [],
   };
 }
@@ -104,6 +105,7 @@ function prospectToDb(p) {
     source: p.source || null,
     last_contact_date: p.lastContactDate || null,
     follow_up_date: p.followUpDate || null,
+    secondary: p.secondary || null,
     notes: p.notes || [],
   };
 }
@@ -985,7 +987,7 @@ function prospectCardHtml(p) {
   return `
     <div class="customer-card" data-id="${p.id}">
       <div>
-        <div class="customer-card__name">${escapeHtml(p.firstName)} ${escapeHtml(p.lastName)}</div>
+        <div class="customer-card__name">${escapeHtml(p.firstName)} ${escapeHtml(p.lastName)}${p.secondary?.firstName ? ` <span class="customer-card__secondary">&amp; ${escapeHtml(p.secondary.firstName)} ${escapeHtml(p.secondary.lastName)}${p.secondary.relationship ? ` <span class="customer-card__rel">(${escapeHtml(p.secondary.relationship)})</span>` : ""}</span>` : ""}</div>
         <div class="customer-card__meta">
           ${addr ? `<span>&#128205; ${escapeHtml(addr)}</span>` : ""}
           ${p.phone ? `<span>&#128222; ${escapeHtml(p.phone)}</span>` : ""}
@@ -1078,7 +1080,10 @@ function openProspect(id) {
   const p = getProspect(id);
   if (!p) return;
 
-  document.getElementById("prospect-detail-name").textContent = `${p.firstName} ${p.lastName}`;
+  const secNameLine = p.secondary?.firstName
+    ? ` <span class="detail-secondary-name">&amp; ${escapeHtml(p.secondary.firstName)} ${escapeHtml(p.secondary.lastName)}${p.secondary.relationship ? ` <span class="detail-secondary-rel">(${escapeHtml(p.secondary.relationship)})</span>` : ""}</span>`
+    : "";
+  document.getElementById("prospect-detail-name").innerHTML = `${escapeHtml(p.firstName)} ${escapeHtml(p.lastName)}${secNameLine}`;
   document.getElementById("prospect-detail-address").textContent = getProspectAddress(p);
   document.getElementById("prospect-stage").value = p.stage || "new";
   document.getElementById("prospect-source").value = p.source || "";
@@ -1095,6 +1100,14 @@ function openProspect(id) {
       <span class="prospect-contact-info__label">Email</span>
       <span>${p.email ? escapeHtml(p.email) : '<em style="color:var(--muted)">Not on file</em>'}</span>
     </div>
+    ${p.secondary?.firstName ? `
+    <div class="prospect-contact-info__row" style="margin-top:0.5rem;padding-top:0.5rem;border-top:1px solid var(--stroke);">
+      <span class="prospect-contact-info__label">${escapeHtml(p.secondary.relationship ? p.secondary.relationship.charAt(0).toUpperCase()+p.secondary.relationship.slice(1) : "Secondary")}</span>
+      <span><strong>${escapeHtml(p.secondary.firstName)} ${escapeHtml(p.secondary.lastName)}</strong></span>
+    </div>
+    ${p.secondary.phone ? `<div class="prospect-contact-info__row"><span class="prospect-contact-info__label">Phone</span><span>${escapeHtml(p.secondary.phone)}</span></div>` : ""}
+    ${p.secondary.email ? `<div class="prospect-contact-info__row"><span class="prospect-contact-info__label">Email</span><span>${escapeHtml(p.secondary.email)}</span></div>` : ""}
+    ` : ""}
     ${p.source ? `<div class="prospect-contact-info__row"><span class="prospect-contact-info__label">Source</span><span>${escapeHtml(STAGE_LABELS[p.source] || p.source)}</span></div>` : ""}
   `;
 
@@ -1254,11 +1267,12 @@ document.getElementById("btn-save-prospect-status").addEventListener("click", as
 document.getElementById("btn-add-prospect").addEventListener("click", () => {
   state.editingProspectId = null;
   document.getElementById("modal-prospect-title").textContent = "Add Prospect";
-  ["prospect-first","prospect-last","prospect-street","prospect-city","prospect-state","prospect-zip","prospect-email","prospect-phone","prospect-form-last-contact","prospect-form-followup"].forEach(id => {
+  ["prospect-first","prospect-last","prospect-street","prospect-city","prospect-state","prospect-zip","prospect-email","prospect-phone","prospect-form-last-contact","prospect-form-followup","prospect-second-first","prospect-second-last","prospect-second-phone","prospect-second-email"].forEach(id => {
     document.getElementById(id).value = "";
   });
   document.getElementById("prospect-form-stage").value = "new";
   document.getElementById("prospect-form-source").value = "";
+  document.getElementById("prospect-second-rel").value = "";
   openModal("modal-prospect");
 });
 
@@ -1279,11 +1293,25 @@ document.getElementById("btn-edit-prospect").addEventListener("click", () => {
   document.getElementById("prospect-form-source").value = p.source || "";
   document.getElementById("prospect-form-last-contact").value = p.lastContactDate || "";
   document.getElementById("prospect-form-followup").value = p.followUpDate || "";
+  document.getElementById("prospect-second-first").value = p.secondary?.firstName || "";
+  document.getElementById("prospect-second-last").value = p.secondary?.lastName || "";
+  document.getElementById("prospect-second-rel").value = p.secondary?.relationship || "";
+  document.getElementById("prospect-second-phone").value = p.secondary?.phone || "";
+  document.getElementById("prospect-second-email").value = p.secondary?.email || "";
   openModal("modal-prospect");
 });
 
 document.getElementById("form-prospect").addEventListener("submit", async e => {
   e.preventDefault();
+  const secFirst = document.getElementById("prospect-second-first").value.trim();
+  const secLast = document.getElementById("prospect-second-last").value.trim();
+  const secondary = (secFirst || secLast) ? {
+    firstName: secFirst,
+    lastName: secLast,
+    relationship: document.getElementById("prospect-second-rel").value,
+    phone: document.getElementById("prospect-second-phone").value.trim(),
+    email: document.getElementById("prospect-second-email").value.trim(),
+  } : null;
   const data = {
     firstName: document.getElementById("prospect-first").value.trim(),
     lastName: document.getElementById("prospect-last").value.trim(),
@@ -1297,6 +1325,7 @@ document.getElementById("form-prospect").addEventListener("submit", async e => {
     source: document.getElementById("prospect-form-source").value,
     lastContactDate: document.getElementById("prospect-form-last-contact").value,
     followUpDate: document.getElementById("prospect-form-followup").value,
+    secondary,
   };
 
   if (state.editingProspectId) {
@@ -1304,7 +1333,10 @@ document.getElementById("form-prospect").addEventListener("submit", async e => {
     if (idx !== -1) {
       state.prospects[idx] = { ...state.prospects[idx], ...data };
       await dbUpdateProspect(state.prospects[idx]);
-      document.getElementById("prospect-detail-name").textContent = `${data.firstName} ${data.lastName}`;
+      const secNameLine = data.secondary?.firstName
+        ? ` <span class="detail-secondary-name">&amp; ${escapeHtml(data.secondary.firstName)} ${escapeHtml(data.secondary.lastName)}${data.secondary.relationship ? ` <span class="detail-secondary-rel">(${escapeHtml(data.secondary.relationship)})</span>` : ""}</span>`
+        : "";
+      document.getElementById("prospect-detail-name").innerHTML = `${escapeHtml(data.firstName)} ${escapeHtml(data.lastName)}${secNameLine}`;
       document.getElementById("prospect-detail-address").textContent = getProspectAddress(data);
     }
   } else {
@@ -1340,7 +1372,8 @@ document.getElementById("btn-convert-prospect").addEventListener("click", async 
     street: p.street || "", city: p.city || "", state: p.state || "", zip: p.zip || "",
     email: p.email || "", phone: p.phone || "",
     status: "active", notes: p.notes || [], contacts: [],
-    startDate: new Date().toISOString().slice(0, 10), secondary: null,
+    startDate: new Date().toISOString().slice(0, 10),
+    secondary: p.secondary || null,
   });
 
   if (newCustomer) {
