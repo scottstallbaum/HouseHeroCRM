@@ -22,7 +22,8 @@ const state = {
   technicians: [],
   currentTechnicianId: null,
   editingTechnicianId: null,
-  returnTo: null, // tracks where to go back from customer detail
+  returnTo: null,      // tracks where to go back from customer detail
+  techReturnTo: null,   // tracks where to go back from technician detail
   appointments: [],
   editingAppointmentId: null,
   apptContext: null, // "customer" | "technician" | "calendar"
@@ -528,7 +529,9 @@ function openCustomer(id) {
   renderCustomerAppointments(id);
 
   document.getElementById("btn-back").textContent =
-    state.returnTo === "technician" ? "← Back to technician" : "← Back to customers";
+    state.returnTo === "technician" ? "← Back to technician" :
+    state.returnTo === "schedule"   ? "← Back to schedule" :
+    "← Back to customers";
 
   viewCustomers.style.display = "none";
   viewDetail.style.display = "block";
@@ -537,11 +540,15 @@ function openCustomer(id) {
 btnBack.addEventListener("click", () => {
   viewDetail.style.display = "none";
   state.currentCustomerId = null;
-  if (state.returnTo === "technician") {
-    state.returnTo = null;
+  const rt = state.returnTo;
+  state.returnTo = null;
+  if (rt === "technician") {
     document.getElementById("view-technician-detail").style.display = "block";
+  } else if (rt === "schedule") {
+    document.getElementById("view-schedule").style.display = "block";
+    document.querySelectorAll(".sidebar__link[data-view]").forEach(l => l.classList.remove("sidebar__link--active"));
+    document.querySelector(".sidebar__link[data-view='schedule']")?.classList.add("sidebar__link--active");
   } else {
-    state.returnTo = null;
     viewCustomers.style.display = "block";
     renderCustomerList(searchInput.value);
   }
@@ -1009,9 +1016,17 @@ function openTechnician(id) {
 
 document.getElementById("btn-back-technician").addEventListener("click", () => {
   document.getElementById("view-technician-detail").style.display = "none";
-  document.getElementById("view-technicians").style.display = "block";
+  const rt = state.techReturnTo;
+  state.techReturnTo = null;
   state.currentTechnicianId = null;
-  renderTechnicianList();
+  if (rt === "schedule") {
+    document.getElementById("view-schedule").style.display = "block";
+    document.querySelectorAll(".sidebar__link[data-view]").forEach(l => l.classList.remove("sidebar__link--active"));
+    document.querySelector(".sidebar__link[data-view='schedule']")?.classList.add("sidebar__link--active");
+  } else {
+    document.getElementById("view-technicians").style.display = "block";
+    renderTechnicianList();
+  }
 });
 
 document.getElementById("btn-add-technician").addEventListener("click", () => {
@@ -2064,12 +2079,12 @@ function renderMasterSchedule() {
     const addr = getFullAddress(c);
     const tech = c.technicianId ? state.technicians.find(t => t.id === c.technicianId) : null;
     const techHtml = tech
-      ? `<span class="master-sched-tech">🔧 ${escapeHtml(tech.firstName)} ${escapeHtml(tech.lastName)}</span>`
+      ? `<a href="#" class="master-sched-tech master-sched-link" data-tech-id="${tech.id}">🔧 ${escapeHtml(tech.firstName)} ${escapeHtml(tech.lastName)}</a>`
       : `<span class="master-sched-tech master-sched-tech--unassigned">Unassigned</span>`;
     return `<div class="master-sched-card">
       <div class="master-sched-header">
         <div>
-          <span class="master-sched-name">${escapeHtml(c.firstName)} ${escapeHtml(c.lastName)}${addr ? `<span style="font-weight:400;font-size:0.82rem;color:var(--muted);margin-left:0.5rem;">${escapeHtml(addr)}</span>` : ""}</span>
+          <a href="#" class="master-sched-name master-sched-link" data-cust-id="${c.id}">${escapeHtml(c.firstName)} ${escapeHtml(c.lastName)}${addr ? `<span style="font-weight:400;font-size:0.82rem;color:var(--muted);margin-left:0.5rem;">${escapeHtml(addr)}</span>` : ""}</a>
           ${techHtml}
         </div>
         <span class="master-sched-total ${overClass}">${total} / ${limit}m</span>
@@ -2079,6 +2094,23 @@ function renderMasterSchedule() {
       </ul>
     </div>`;
   }).join("");
+
+  listEl.querySelectorAll("[data-cust-id]").forEach(el => {
+    el.addEventListener("click", e => {
+      e.preventDefault();
+      state.returnTo = "schedule";
+      document.getElementById("view-schedule").style.display = "none";
+      openCustomer(el.dataset.custId);
+    });
+  });
+  listEl.querySelectorAll("[data-tech-id]").forEach(el => {
+    el.addEventListener("click", e => {
+      e.preventDefault();
+      state.techReturnTo = "schedule";
+      document.getElementById("view-schedule").style.display = "none";
+      openTechnician(el.dataset.techId);
+    });
+  });
 }
 
 // ── Appointment Constants ──────────────────────────────────

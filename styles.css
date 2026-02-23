@@ -1097,6 +1097,16 @@ textarea::placeholder {
   font-weight: 700;
 }
 
+.master-sched-link {
+  text-decoration: none;
+  color: inherit;
+}
+
+.master-sched-link:hover {
+  text-decoration: underline;
+  color: var(--accent);
+}
+
 .master-sched-tech {
   font-size: 0.78rem;
   color: var(--muted);
