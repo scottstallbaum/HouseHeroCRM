@@ -433,7 +433,10 @@
           <h1 class="view__title">Calendar</h1>
           <p class="view__subtitle" id="calendar-subtitle">Upcoming appointments</p>
         </div>
-        <button id="btn-add-calendar-appointment" type="button">+ Schedule Appointment</button>
+        <div style="display:flex;gap:0.5rem;align-items:center;">
+          <button id="cal-closures-toggle" class="ghost" type="button" title="Show/hide company closures">🏢 Closures</button>
+          <button id="btn-add-calendar-appointment" type="button">+ Schedule Appointment</button>
+        </div>
       </div>
       <div class="calendar-controls">
         <div class="calendar-view-toggle">
@@ -445,7 +448,6 @@
           <button id="cal-today" class="ghost ghost--small" type="button">Today</button>
           <button id="cal-next" class="ghost ghost--small" type="button">Next &#8594;</button>
         </div>
-        <button id="cal-closures-toggle" class="ghost ghost--small" type="button" title="Show/hide company closures">🏢 Closures</button>
         <select id="calendar-tech-filter">
           <option value="">All Technicians</option>
         </select>
