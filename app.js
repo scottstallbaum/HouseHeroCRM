@@ -2059,6 +2059,18 @@ function appointmentCardHtml(a, opts = {}) {
     </div>`;
 }
 
+function appointmentPillHtml(a) {
+  const cust = a.customerId ? state.customers.find(c => c.id === a.customerId) : null;
+  const tech = a.technicianId ? state.technicians.find(t => t.id === a.technicianId) : null;
+  const statusClass = a.status === "completed" ? "completed" : a.status === "cancelled" ? "cancelled" : "scheduled";
+  const line1 = a.startTime ? formatTime(a.startTime) : "TBD";
+  const line2 = cust ? `${escapeHtml(cust.firstName)} ${escapeHtml(cust.lastName)}` : (tech ? escapeHtml(tech.firstName + " " + tech.lastName) : (APPT_TYPE_LABELS[a.type] || a.type).replace(/^\S+\s/, ""));
+  return `<div class="cal-week-pill cal-week-pill--${escapeHtml(a.type)} appt-status--${statusClass}" data-appt-id="${a.id}" title="${escapeHtml((APPT_TYPE_LABELS[a.type]||a.type).replace(/^\S+\s/,''))}${cust ? ' — '+cust.firstName+' '+cust.lastName : ''}${a.startTime ? ' @ '+formatTime(a.startTime) : ''}">
+    <span class="cal-week-pill__time">${line1}</span>
+    <span class="cal-week-pill__name">${line2}</span>
+  </div>`;
+}
+
 function bindApptEvents(containerEl) {
   containerEl.querySelectorAll(".appt-cust-link").forEach(link => {
     link.addEventListener("click", e => {
@@ -2197,7 +2209,7 @@ function renderWeekCalendar() {
     const dayName = d.toLocaleDateString("en-US", { weekday: "short" });
     const dayNum = d.toLocaleDateString("en-US", { month: "numeric", day: "numeric" });
     const cards = dayAppts.length
-      ? dayAppts.map(a => appointmentCardHtml(a, {})).join("")
+      ? dayAppts.map(a => appointmentPillHtml(a)).join("")
       : `<div class="cal-empty-day">\u2014</div>`;
     return `<div class="cal-week-col${isToday ? " cal-week-col--today" : ""}">
       <div class="cal-week-day-header">
@@ -2208,7 +2220,9 @@ function renderWeekCalendar() {
     </div>`;
   }).join("");
   el.innerHTML = `<div class="cal-week-grid">${cols}</div>`;
-  bindApptEvents(el);
+  el.querySelectorAll(".cal-week-pill").forEach(pill => {
+    pill.addEventListener("click", () => openEditAppointmentModal(pill.dataset.apptId));
+  });
 }
 
 function renderMonthCalendar() {

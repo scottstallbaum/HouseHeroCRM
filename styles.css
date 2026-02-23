@@ -1308,7 +1308,65 @@ textarea::placeholder {
   padding: 0.5rem 0;
 }
 
-/* ── Month Grid ──────────────────────────────────── */
+/* Compact week pills */
+.cal-week-pill {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 0.25rem 0.45rem;
+  border-radius: 5px;
+  border-left: 3px solid transparent;
+  cursor: pointer;
+  transition: filter 0.12s;
+  overflow: hidden;
+}
+
+.cal-week-pill:hover {
+  filter: brightness(0.93);
+}
+
+.cal-week-pill__time {
+  font-family: "Space Mono", monospace;
+  font-size: 0.68rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.cal-week-pill__name {
+  font-size: 0.78rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cal-week-pill--maintenance {
+  background: #dbeafe;
+  border-left-color: #3b82f6;
+  color: #1e3a5f;
+}
+
+.cal-week-pill--consult {
+  background: #fef9c3;
+  border-left-color: #eab308;
+  color: #713f12;
+}
+
+.cal-week-pill--work_order {
+  background: #dcfce7;
+  border-left-color: #22c55e;
+  color: #14532d;
+}
+
+.cal-week-pill.appt-status--completed {
+  opacity: 0.5;
+}
+
+.cal-week-pill.appt-status--cancelled {
+  opacity: 0.35;
+  text-decoration: line-through;
+}
+
+
 .cal-month-hdr-row {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
@@ -1378,17 +1436,17 @@ textarea::placeholder {
 
 .cal-pill--maintenance {
   background: #dbeafe;
-  color: #1e40af;
+  color: #1e3a5f;
 }
 
 .cal-pill--consult {
-  background: #dcfce7;
-  color: #166534;
+  background: #fef9c3;
+  color: #713f12;
 }
 
 .cal-pill--work_order {
-  background: #fef3c7;
-  color: #92400e;
+  background: #dcfce7;
+  color: #14532d;
 }
 
 .cal-pill-more {
