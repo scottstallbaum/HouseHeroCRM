@@ -2910,7 +2910,6 @@ function openAppointmentModal(defaults = {}) {
   document.getElementById("appt-start-time").value = defaults.startTime || "09:00";
   document.getElementById("appt-duration").value = 75;
   document.getElementById("appt-notes").value = "";
-  document.getElementById("appt-additional-work").value = "";
   document.getElementById("appt-recurrence").value = "";
   document.getElementById("appt-recurrence-end").value = "";
   toggleRecurrenceEnd();
