@@ -2774,6 +2774,7 @@ function refreshApptContactDropdown(type, preserveValue = null) {
     if (labelText) labelText.textContent = "Prospect";
     sel.innerHTML = `<option value="">-- No prospect linked --</option>` +
       [...state.prospects]
+        .filter(p => p.stage !== "won" && p.stage !== "lost")
         .sort((a, b) => `${a.lastName}${a.firstName}`.localeCompare(`${b.lastName}${b.firstName}`))
         .map(p => `<option value="${p.id}">${escapeHtml(p.lastName)}, ${escapeHtml(p.firstName)}</option>`)
         .join("");
@@ -2781,6 +2782,7 @@ function refreshApptContactDropdown(type, preserveValue = null) {
     if (labelText) labelText.textContent = "Customer";
     sel.innerHTML = `<option value="">-- No customer linked --</option>` +
       [...state.customers]
+        .filter(c => c.status !== "inactive")
         .sort((a, b) => `${a.lastName}${a.firstName}`.localeCompare(`${b.lastName}${b.firstName}`))
         .map(c => `<option value="${c.id}">${escapeHtml(c.lastName)}, ${escapeHtml(c.firstName)}${c.customerNumber ? ` (${c.customerNumber})` : ""}</option>`)
         .join("");
