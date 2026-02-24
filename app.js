@@ -2824,23 +2824,12 @@ function refreshApptContactDropdown(type, preserveValue = null) {
   const labelText = document.getElementById("appt-contact-text");
   const sel = document.getElementById("appt-customer");
   if (type === "consult" || type === "a_la_carte") {
-    if (labelText) labelText.textContent = type === "consult" ? "Prospect" : "Customer or Prospect";
+    if (labelText) labelText.textContent = "Prospect";
     const prospectOpts = [...state.prospects]
       .filter(p => p.stage !== "won" && p.stage !== "lost")
       .sort((a, b) => `${a.lastName}${a.firstName}`.localeCompare(`${b.lastName}${b.firstName}`));
-    if (type === "a_la_carte") {
-      // Show customers first, then prospects (labelled)
-      const custOpts = [...state.customers]
-        .filter(c => c.status !== "inactive")
-        .sort((a, b) => `${a.lastName}${a.firstName}`.localeCompare(`${b.lastName}${b.firstName}`));
-      sel.innerHTML =
-        `<option value="">-- None --</option>` +
-        (custOpts.length ? `<optgroup label="Customers">${custOpts.map(c => `<option value="cust:${c.id}">${escapeHtml(c.lastName)}, ${escapeHtml(c.firstName)}${c.customerNumber ? ` (${c.customerNumber})` : ""}</option>`).join("")}</optgroup>` : "") +
-        (prospectOpts.length ? `<optgroup label="Prospects">${prospectOpts.map(p => `<option value="prospect:${p.id}">${escapeHtml(p.lastName)}, ${escapeHtml(p.firstName)}</option>`).join("")}</optgroup>` : "");
-    } else {
-      sel.innerHTML = `<option value="">-- No prospect linked --</option>` +
-        prospectOpts.map(p => `<option value="${p.id}">${escapeHtml(p.lastName)}, ${escapeHtml(p.firstName)}</option>`).join("");
-    }
+    sel.innerHTML = `<option value="">-- No prospect linked --</option>` +
+      prospectOpts.map(p => `<option value="${p.id}">${escapeHtml(p.lastName)}, ${escapeHtml(p.firstName)}</option>`).join("");
   } else {
     if (labelText) labelText.textContent = "Customer";
     sel.innerHTML = `<option value="">-- No customer linked --</option>` +
@@ -2925,7 +2914,7 @@ function openAppointmentModal(defaults = {}) {
   document.getElementById("appt-recurrence-end").value = "";
   toggleRecurrenceEnd();
   document.getElementById("appt-technician").value = defaults.technicianId || "";
-  const contactId = newType === "consult" ? (defaults.prospectId || "") : (defaults.customerId || "");
+  const contactId = (newType === "consult" || newType === "a_la_carte") ? (defaults.prospectId || "") : (defaults.customerId || "");
   refreshApptContactDropdown(newType, contactId);
   refreshMaintenanceTaskList();
   openModal("modal-appointment");
@@ -2958,9 +2947,7 @@ function openEditAppointmentModal(apptId) {
   document.getElementById("appt-recurrence-end").value = a.recurrenceEndDate || "";
   toggleRecurrenceEnd();
   document.getElementById("appt-technician").value = a.technicianId || "";
-  const editContactId = editType === "consult" ? (a.prospectId || "")
-    : editType === "a_la_carte" ? (a.prospectId ? `prospect:${a.prospectId}` : a.customerId ? `cust:${a.customerId}` : "")
-    : (a.customerId || "");
+  const editContactId = (editType === "consult" || editType === "a_la_carte") ? (a.prospectId || "") : (a.customerId || "");
   refreshApptContactDropdown(editType, editContactId);
   refreshMaintenanceTaskList();
   openModal("modal-appointment");
@@ -3046,8 +3033,8 @@ document.getElementById("form-appointment").addEventListener("submit", async e =
     date: document.getElementById("appt-date").value,
     startTime, endTime,
     technicianId: document.getElementById("appt-technician").value || null,
-    customerId: apptType === "consult" ? null : apptType === "a_la_carte" ? (contactId?.startsWith("cust:") ? contactId.slice(5) : null) : contactId,
-    prospectId: apptType === "consult" ? contactId : apptType === "a_la_carte" ? (contactId?.startsWith("prospect:") ? contactId.slice(9) : null) : null,
+    customerId: (apptType === "consult" || apptType === "a_la_carte") ? null : contactId,
+    prospectId: (apptType === "consult" || apptType === "a_la_carte") ? contactId : null,
     notes: document.getElementById("appt-notes").value.trim(),
     additionalWork: "",
     scheduledTasks: apptType === "maintenance"
