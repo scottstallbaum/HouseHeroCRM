@@ -1285,6 +1285,7 @@ function openProspect(id) {
   `;
 
   renderProspectNotes(p);
+  renderProspectAppointments(id);
   loadAndRenderContactLog(id);
   document.getElementById("view-prospects").style.display = "none";
   document.getElementById("view-prospect-detail").style.display = "block";
@@ -2303,9 +2304,20 @@ function refreshApptContext() {
     renderCustomerAppointments(state.currentCustomerId);
   } else if (state.apptContext === "technician" && state.currentTechnicianId) {
     renderTechnicianAppointments(state.currentTechnicianId);
+  } else if (state.apptContext === "prospect" && state.currentProspectId) {
+    renderProspectAppointments(state.currentProspectId);
   } else {
     renderCalendar();
   }
+}
+
+function renderProspectAppointments(prospectId) {
+  const containerEl = document.getElementById("prospect-appointment-list");
+  if (!containerEl) return;
+  const appts = state.appointments
+    .filter(a => a.prospectId === prospectId)
+    .sort((a, b) => b.date.localeCompare(a.date) || (b.startTime || "").localeCompare(a.startTime || ""));
+  renderAppointmentList(appts, containerEl, { hideCust: true });
 }
 
 function renderCustomerAppointments(customerId) {
@@ -3214,4 +3226,9 @@ document.getElementById("btn-add-customer-appointment").addEventListener("click"
   state.apptContext = "customer";
   const c = getCustomer(state.currentCustomerId);
   openAppointmentModal({ customerId: state.currentCustomerId || "", technicianId: c?.technicianId || "" });
+});
+
+document.getElementById("btn-add-prospect-appointment").addEventListener("click", () => {
+  state.apptContext = "prospect";
+  openAppointmentModal({ prospectId: state.currentProspectId || "", type: "consult" });
 });
