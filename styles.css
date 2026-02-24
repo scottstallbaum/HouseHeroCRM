@@ -722,6 +722,7 @@ textarea::placeholder {
 .badge--follow-up { background: #fef3c7; color: #92400e; }
 .badge--consultation { background: #fce7f3; color: #9d174d; }
 .badge--proposal  { background: #ede9fe; color: #6d28d9; }
+.badge--one_off   { background: #ffedd5; color: #9a3412; }
 .badge--won       { background: #d1fae5; color: #065f46; }
 .badge--lost      { background: #fee2e2; color: #991b1b; }
 

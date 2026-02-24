@@ -1151,7 +1151,7 @@ document.getElementById("prospect-search-input").addEventListener("input", () =>
 const STAGE_LABELS = {
   new: "New Lead", contacted: "Contacted", "follow-up": "Follow-up",
   consultation: "In-Home Consultation Complete",
-  proposal: "Proposed Schedule Sent", won: "Won", lost: "Lost",
+  proposal: "Proposed Schedule Sent", one_off: "One-Off Client", won: "Won", lost: "Lost",
 };
 
 function prospectCardHtml(p) {
@@ -2157,6 +2157,7 @@ const APPT_TYPE_LABELS = {
   maintenance: "🔧 Maintenance Visit",
   consult: "🏠 In-Home Consultation",
   work_order: "🛠️ Work Order",
+  a_la_carte: "✨ A La Carte Service",
 };
 
 // (appointmentToDb, dbInsertAppointment, dbUpdateAppointment, dbDeleteAppointment live at top of file)
@@ -2822,14 +2823,24 @@ function populateApptDropdowns() {
 function refreshApptContactDropdown(type, preserveValue = null) {
   const labelText = document.getElementById("appt-contact-text");
   const sel = document.getElementById("appt-customer");
-  if (type === "consult") {
-    if (labelText) labelText.textContent = "Prospect";
-    sel.innerHTML = `<option value="">-- No prospect linked --</option>` +
-      [...state.prospects]
-        .filter(p => p.stage !== "won" && p.stage !== "lost")
-        .sort((a, b) => `${a.lastName}${a.firstName}`.localeCompare(`${b.lastName}${b.firstName}`))
-        .map(p => `<option value="${p.id}">${escapeHtml(p.lastName)}, ${escapeHtml(p.firstName)}</option>`)
-        .join("");
+  if (type === "consult" || type === "a_la_carte") {
+    if (labelText) labelText.textContent = type === "consult" ? "Prospect" : "Customer or Prospect";
+    const prospectOpts = [...state.prospects]
+      .filter(p => p.stage !== "won" && p.stage !== "lost")
+      .sort((a, b) => `${a.lastName}${a.firstName}`.localeCompare(`${b.lastName}${b.firstName}`));
+    if (type === "a_la_carte") {
+      // Show customers first, then prospects (labelled)
+      const custOpts = [...state.customers]
+        .filter(c => c.status !== "inactive")
+        .sort((a, b) => `${a.lastName}${a.firstName}`.localeCompare(`${b.lastName}${b.firstName}`));
+      sel.innerHTML =
+        `<option value="">-- None --</option>` +
+        (custOpts.length ? `<optgroup label="Customers">${custOpts.map(c => `<option value="cust:${c.id}">${escapeHtml(c.lastName)}, ${escapeHtml(c.firstName)}${c.customerNumber ? ` (${c.customerNumber})` : ""}</option>`).join("")}</optgroup>` : "") +
+        (prospectOpts.length ? `<optgroup label="Prospects">${prospectOpts.map(p => `<option value="prospect:${p.id}">${escapeHtml(p.lastName)}, ${escapeHtml(p.firstName)}</option>`).join("")}</optgroup>` : "");
+    } else {
+      sel.innerHTML = `<option value="">-- No prospect linked --</option>` +
+        prospectOpts.map(p => `<option value="${p.id}">${escapeHtml(p.lastName)}, ${escapeHtml(p.firstName)}</option>`).join("");
+    }
   } else {
     if (labelText) labelText.textContent = "Customer";
     sel.innerHTML = `<option value="">-- No customer linked --</option>` +
@@ -2947,7 +2958,9 @@ function openEditAppointmentModal(apptId) {
   document.getElementById("appt-recurrence-end").value = a.recurrenceEndDate || "";
   toggleRecurrenceEnd();
   document.getElementById("appt-technician").value = a.technicianId || "";
-  const editContactId = editType === "consult" ? (a.prospectId || "") : (a.customerId || "");
+  const editContactId = editType === "consult" ? (a.prospectId || "")
+    : editType === "a_la_carte" ? (a.prospectId ? `prospect:${a.prospectId}` : a.customerId ? `cust:${a.customerId}` : "")
+    : (a.customerId || "");
   refreshApptContactDropdown(editType, editContactId);
   refreshMaintenanceTaskList();
   openModal("modal-appointment");
@@ -3033,8 +3046,8 @@ document.getElementById("form-appointment").addEventListener("submit", async e =
     date: document.getElementById("appt-date").value,
     startTime, endTime,
     technicianId: document.getElementById("appt-technician").value || null,
-    customerId: apptType === "consult" ? null : contactId,
-    prospectId: apptType === "consult" ? contactId : null,
+    customerId: apptType === "consult" ? null : apptType === "a_la_carte" ? (contactId?.startsWith("cust:") ? contactId.slice(5) : null) : contactId,
+    prospectId: apptType === "consult" ? contactId : apptType === "a_la_carte" ? (contactId?.startsWith("prospect:") ? contactId.slice(9) : null) : null,
     notes: document.getElementById("appt-notes").value.trim(),
     additionalWork: "",
     scheduledTasks: apptType === "maintenance"
