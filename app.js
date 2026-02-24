@@ -1667,7 +1667,15 @@ function renderScheduleCard(customerId) {
   const limitMinutes = c?.minutesLimit || 75;
 
   if (!state.scheduleEditMode) {
-    el.innerHTML = buildScheduleSummaryHTML(sched.tasks, sched.schedule, limitMinutes);
+    // Build period → completed appointment map
+    const completedByPeriod = {};
+    state.appointments
+      .filter(a => a.customerId === customerId && a.type === "maintenance" && a.status === "completed" && a.date)
+      .forEach(a => {
+        const period = getPeriodFromDate(a.date);
+        if (period && !completedByPeriod[period]) completedByPeriod[period] = a;
+      });
+    el.innerHTML = buildScheduleSummaryHTML(sched.tasks, sched.schedule, limitMinutes, completedByPeriod);
     return;
   }
 
@@ -1717,7 +1725,7 @@ function updateScheduleTotals(customerId) {
   });
 }
 
-function buildScheduleSummaryHTML(tasks, schedule, limitMinutes) {
+function buildScheduleSummaryHTML(tasks, schedule, limitMinutes, completedByPeriod = {}) {
   const anyTasks = SCHEDULE_PERIODS.some(p => {
     const ids = schedule[p];
     return Array.isArray(ids) && ids.length > 0;
@@ -1744,9 +1752,18 @@ function buildScheduleSummaryHTML(tasks, schedule, limitMinutes) {
     )
   );
 
-  const headerCols = SCHEDULE_PERIODS.map(p =>
-    `<th class="${overSet.has(p) ? "sched-summary-col--over" : ""}">${escapeHtml(p)}</th>`
-  ).join("");
+  const headerCols = SCHEDULE_PERIODS.map(p => {
+    const overClass = overSet.has(p) ? "sched-summary-col--over" : "";
+    const done = completedByPeriod[p];
+    let doneHtml = "";
+    if (done) {
+      const total = done.scheduledTasks ? done.scheduledTasks.length : 0;
+      const completed = done.scheduledTasks ? done.scheduledTasks.filter(t => t.completed).length : 0;
+      const dateStr = done.date ? formatApptDate(done.date) : "";
+      doneHtml = `<div class="sched-period-done">✓ ${total > 0 ? `${completed}/${total} tasks` : "completed"}${dateStr ? `<br><span class="sched-period-done__date">${dateStr}</span>` : ""}</div>`;
+    }
+    return `<th class="${overClass}">${escapeHtml(p)}${doneHtml}</th>`;
+  }).join("");
 
   const bodyRows = activeCategories.map(category => {
     const catTasks = tasks.filter(t => t.category === category);

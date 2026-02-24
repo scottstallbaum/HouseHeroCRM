@@ -924,6 +924,22 @@ textarea::placeholder {
 }
 
 /* ── Schedule Table ───────────────────────────────────────── */
+.sched-period-done {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #15803d;
+  background: #dcfce7;
+  border-radius: 4px;
+  padding: 0.15rem 0.35rem;
+  margin-top: 0.25rem;
+  white-space: nowrap;
+}
+.sched-period-done__date {
+  font-weight: 400;
+  color: #166534;
+  font-size: 0.65rem;
+}
+
 .schedule-table-wrap {
   overflow-x: auto;
   margin: 0 -0.25rem;
