@@ -902,8 +902,19 @@
           </label>
           <label class="span-2">
             Notes
-            <textarea id="appt-notes" rows="3" placeholder="Any notes about this appointment..."></textarea>
+            <textarea id="appt-notes" rows="2" placeholder="Any notes about this appointment..."></textarea>
           </label>
+          <div class="span-2" id="appt-work-order-section" style="display:none;">
+            <div class="work-order-header">
+              <span class="work-order-title">📋 Scheduled Tasks</span>
+              <span class="work-order-period" id="appt-work-order-period"></span>
+            </div>
+            <div id="appt-tasks-list" class="appt-tasks-list"></div>
+            <label style="margin-top:0.75rem;display:block;">
+              Additional Work Performed
+              <textarea id="appt-additional-work" rows="2" placeholder="Anything done that wasn't on the scheduled task list..."></textarea>
+            </label>
+          </div>
           <label>
             Repeat
             <select id="appt-recurrence">

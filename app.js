@@ -295,6 +295,8 @@ function appointmentFromDb(row) {
     recurrence: row.recurrence || null,
     recurrenceEndDate: row.recurrence_end_date || null,
     status: row.status || "scheduled",
+    scheduledTasks: row.scheduled_tasks || [],
+    additionalWork: row.additional_work || "",
     createdAt: row.created_at,
   };
 }
@@ -313,6 +315,8 @@ function appointmentToDb(a) {
     recurrence: a.recurrence || null,
     recurrence_end_date: a.recurrenceEndDate || null,
     status: a.status || "scheduled",
+    scheduled_tasks: a.scheduledTasks || [],
+    additional_work: a.additionalWork || null,
   };
 }
 
@@ -1559,6 +1563,12 @@ const SCHEDULE_CATEGORIES = [
 ];
 const SCHEDULE_YEAR = new Date().getFullYear();
 
+function getPeriodFromDate(dateStr) {
+  if (!dateStr) return null;
+  const month = parseInt(dateStr.split("-")[1], 10);
+  return SCHEDULE_PERIODS[Math.floor((month - 1) / 2)] || null;
+}
+
 function seedScheduleTasks() {
   return [
     { id: generateId(), name: "Refrigerator Filter", minutes: 5, category: "Appliance Maintenance", frequency: "every" },
@@ -2168,6 +2178,11 @@ function appointmentCardHtml(a, opts = {}) {
           ${!opts.hideCust && cust ? `<span>\uD83D\uDC64 <a class="appt-cust-link" data-cust-id="${cust.id}" href="#">${escapeHtml(cust.firstName)} ${escapeHtml(cust.lastName)}</a></span>` : ""}
           ${!opts.hideCust && prospect ? `<span>\uD83D\uDC64 <a class="appt-prospect-link" data-prospect-id="${prospect.id}" href="#">${escapeHtml(prospect.firstName)} ${escapeHtml(prospect.lastName)}</a> <span class="badge--prospect">Prospect</span></span>` : ""}
           ${a.notes ? `<span class="appt-notes-preview">\uD83D\uDCAC ${escapeHtml(a.notes)}</span>` : ""}
+          ${a.scheduledTasks && a.scheduledTasks.length > 0 ? `
+          <div class="appt-work-summary">
+            ${a.scheduledTasks.map(t => `<span class="appt-work-task appt-work-task--${t.completed ? "done" : "skip"}">${t.completed ? "\u2713" : "\u2715"} ${escapeHtml(t.name)}</span>`).join("")}
+            ${a.additionalWork ? `<span class="appt-work-extra">+ ${escapeHtml(a.additionalWork)}</span>` : ""}
+          </div>` : ""}
         </div>
       </div>
       <div style="display:flex;align-items:center;gap:0.5rem;flex-shrink:0;">
@@ -2792,7 +2807,62 @@ function refreshApptContactDropdown(type, preserveValue = null) {
 
 document.getElementById("appt-type").addEventListener("change", () => {
   refreshApptContactDropdown(document.getElementById("appt-type").value);
+  refreshMaintenanceTaskList();
 });
+
+function refreshMaintenanceTaskList(prefillTasks = null) {
+  const type = document.getElementById("appt-type").value;
+  const customerId = document.getElementById("appt-customer").value;
+  const dateStr = document.getElementById("appt-date").value;
+  const section = document.getElementById("appt-work-order-section");
+  const listEl = document.getElementById("appt-tasks-list");
+  const periodEl = document.getElementById("appt-work-order-period");
+
+  if (type !== "maintenance" || !customerId) {
+    section.style.display = "none";
+    return;
+  }
+
+  const period = getPeriodFromDate(dateStr);
+  const sched = state.schedules[customerId];
+
+  // If schedule not loaded yet, load it then re-render
+  if (!sched) {
+    section.style.display = "none";
+    dbLoadSchedule(customerId, SCHEDULE_YEAR).then(row => {
+      if (row) state.schedules[customerId] = { year: row.year, tasks: row.tasks || [], schedule: row.schedule || {} };
+      refreshMaintenanceTaskList(prefillTasks);
+    });
+    return;
+  }
+
+  const scheduledIds = period && sched.schedule[period] ? sched.schedule[period] : [];
+  const tasks = scheduledIds.map(id => sched.tasks.find(t => t.id === id)).filter(Boolean);
+
+  if (tasks.length === 0 && !prefillTasks) {
+    periodEl.textContent = period ? `(${period} — no tasks scheduled)` : "";
+    listEl.innerHTML = `<p class="work-order-empty">No tasks scheduled for this period. You can still log additional work below.</p>`;
+    section.style.display = "";
+    return;
+  }
+
+  periodEl.textContent = period ? `(${period})` : "";
+  section.style.display = "";
+
+  // Build checkbox list — use prefillTasks (existing saved state) or default all checked
+  const taskSource = prefillTasks && prefillTasks.length > 0 ? prefillTasks : tasks.map(t => ({ ...t, completed: true }));
+
+  listEl.innerHTML = taskSource.map(t => `
+    <label class="work-order-task">
+      <input type="checkbox" class="appt-task-cb" data-task-id="${t.id}" data-task-name="${escapeHtml(t.name)}" data-task-minutes="${t.minutes || 0}" ${t.completed ? "checked" : ""} />
+      <span class="work-order-task__name">${escapeHtml(t.name)}</span>
+      <span class="work-order-task__min">${t.minutes || 0}m</span>
+    </label>`).join("");
+}
+
+// Re-run when customer or date changes
+document.getElementById("appt-customer").addEventListener("change", refreshMaintenanceTaskList);
+document.getElementById("appt-date").addEventListener("change", refreshMaintenanceTaskList);
 
 function openAppointmentModal(defaults = {}) {
   state.editingAppointmentId = null;
@@ -2806,12 +2876,14 @@ function openAppointmentModal(defaults = {}) {
   document.getElementById("appt-start-time").value = defaults.startTime || "09:00";
   document.getElementById("appt-duration").value = 75;
   document.getElementById("appt-notes").value = "";
+  document.getElementById("appt-additional-work").value = "";
   document.getElementById("appt-recurrence").value = "";
   document.getElementById("appt-recurrence-end").value = "";
   toggleRecurrenceEnd();
   document.getElementById("appt-technician").value = defaults.technicianId || "";
   const contactId = newType === "consult" ? (defaults.prospectId || "") : (defaults.customerId || "");
   refreshApptContactDropdown(newType, contactId);
+  refreshMaintenanceTaskList();
   openModal("modal-appointment");
 }
 
@@ -2835,12 +2907,14 @@ function openEditAppointmentModal(apptId) {
     document.getElementById("appt-duration").value = 75;
   }
   document.getElementById("appt-notes").value = a.notes || "";
+  document.getElementById("appt-additional-work").value = a.additionalWork || "";
   document.getElementById("appt-recurrence").value = a.recurrence || "";
   document.getElementById("appt-recurrence-end").value = a.recurrenceEndDate || "";
   toggleRecurrenceEnd();
   document.getElementById("appt-technician").value = a.technicianId || "";
   const editContactId = editType === "consult" ? (a.prospectId || "") : (a.customerId || "");
   refreshApptContactDropdown(editType, editContactId);
+  refreshMaintenanceTaskList(a.scheduledTasks && a.scheduledTasks.length > 0 ? a.scheduledTasks : null);
   openModal("modal-appointment");
 }
 
@@ -2927,6 +3001,15 @@ document.getElementById("form-appointment").addEventListener("submit", async e =
     customerId: apptType === "consult" ? null : contactId,
     prospectId: apptType === "consult" ? contactId : null,
     notes: document.getElementById("appt-notes").value.trim(),
+    additionalWork: document.getElementById("appt-additional-work").value.trim(),
+    scheduledTasks: apptType === "maintenance"
+      ? [...document.querySelectorAll("#appt-tasks-list .appt-task-cb")].map(cb => ({
+          id: cb.dataset.taskId,
+          name: cb.dataset.taskName,
+          minutes: parseInt(cb.dataset.taskMinutes, 10) || 0,
+          completed: cb.checked,
+        }))
+      : [],
     title: "", recurrence, recurrenceEndDate,
   };
 
