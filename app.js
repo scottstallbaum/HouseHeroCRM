@@ -26,6 +26,7 @@ const state = {
   techReturnTo: null,   // tracks where to go back from technician detail
   appointments: [],
   editingAppointmentId: null,
+  completingAppointmentId: null,
   apptContext: null, // "customer" | "technician" | "calendar"
   calendarView: "week",
   calendarDate: new Date(),
@@ -2226,6 +2227,9 @@ function bindApptEvents(containerEl) {
   containerEl.querySelectorAll(".appt-edit-btn").forEach(btn => {
     btn.addEventListener("click", () => openEditAppointmentModal(btn.dataset.apptId));
   });
+  containerEl.querySelectorAll(".appt-complete-btn").forEach(btn => {
+    btn.addEventListener("click", () => openCompleteAppointmentModal(btn.dataset.apptId));
+  });
   containerEl.querySelectorAll(".appt-delete-btn").forEach(btn => {
     btn.addEventListener("click", async () => {
       if (!confirm("Delete this appointment?")) return;
@@ -2810,7 +2814,7 @@ document.getElementById("appt-type").addEventListener("change", () => {
   refreshMaintenanceTaskList();
 });
 
-function refreshMaintenanceTaskList(prefillTasks = null) {
+function refreshMaintenanceTaskList() {
   const type = document.getElementById("appt-type").value;
   const customerId = document.getElementById("appt-customer").value;
   const dateStr = document.getElementById("appt-date").value;
@@ -2831,7 +2835,7 @@ function refreshMaintenanceTaskList(prefillTasks = null) {
     section.style.display = "none";
     dbLoadSchedule(customerId, SCHEDULE_YEAR).then(row => {
       if (row) state.schedules[customerId] = { year: row.year, tasks: row.tasks || [], schedule: row.schedule || {} };
-      refreshMaintenanceTaskList(prefillTasks);
+      refreshMaintenanceTaskList();
     });
     return;
   }
@@ -2839,9 +2843,9 @@ function refreshMaintenanceTaskList(prefillTasks = null) {
   const scheduledIds = period && sched.schedule[period] ? sched.schedule[period] : [];
   const tasks = scheduledIds.map(id => sched.tasks.find(t => t.id === id)).filter(Boolean);
 
-  if (tasks.length === 0 && !prefillTasks) {
+  if (tasks.length === 0) {
     periodEl.textContent = period ? `(${period} — no tasks scheduled)` : "";
-    listEl.innerHTML = `<p class="work-order-empty">No tasks scheduled for this period. You can still log additional work below.</p>`;
+    listEl.innerHTML = `<p class="work-order-empty">No tasks scheduled for this period.</p>`;
     section.style.display = "";
     return;
   }
@@ -2849,15 +2853,11 @@ function refreshMaintenanceTaskList(prefillTasks = null) {
   periodEl.textContent = period ? `(${period})` : "";
   section.style.display = "";
 
-  // Build checkbox list — use prefillTasks (existing saved state) or default all checked
-  const taskSource = prefillTasks && prefillTasks.length > 0 ? prefillTasks : tasks.map(t => ({ ...t, completed: true }));
-
-  listEl.innerHTML = taskSource.map(t => `
-    <label class="work-order-task">
-      <input type="checkbox" class="appt-task-cb" data-task-id="${t.id}" data-task-name="${escapeHtml(t.name)}" data-task-minutes="${t.minutes || 0}" ${t.completed ? "checked" : ""} />
+  listEl.innerHTML = tasks.map(t => `
+    <div class="work-order-task" data-task-id="${t.id}" data-task-name="${escapeHtml(t.name)}" data-task-minutes="${t.minutes || 0}">
       <span class="work-order-task__name">${escapeHtml(t.name)}</span>
       <span class="work-order-task__min">${t.minutes || 0}m</span>
-    </label>`).join("");
+    </div>`).join("");
 }
 
 // Re-run when customer or date changes
@@ -2907,14 +2907,13 @@ function openEditAppointmentModal(apptId) {
     document.getElementById("appt-duration").value = 75;
   }
   document.getElementById("appt-notes").value = a.notes || "";
-  document.getElementById("appt-additional-work").value = a.additionalWork || "";
   document.getElementById("appt-recurrence").value = a.recurrence || "";
   document.getElementById("appt-recurrence-end").value = a.recurrenceEndDate || "";
   toggleRecurrenceEnd();
   document.getElementById("appt-technician").value = a.technicianId || "";
   const editContactId = editType === "consult" ? (a.prospectId || "") : (a.customerId || "");
   refreshApptContactDropdown(editType, editContactId);
-  refreshMaintenanceTaskList(a.scheduledTasks && a.scheduledTasks.length > 0 ? a.scheduledTasks : null);
+  refreshMaintenanceTaskList();
   openModal("modal-appointment");
 }
 
@@ -3001,14 +3000,23 @@ document.getElementById("form-appointment").addEventListener("submit", async e =
     customerId: apptType === "consult" ? null : contactId,
     prospectId: apptType === "consult" ? contactId : null,
     notes: document.getElementById("appt-notes").value.trim(),
-    additionalWork: document.getElementById("appt-additional-work").value.trim(),
+    additionalWork: "",
     scheduledTasks: apptType === "maintenance"
-      ? [...document.querySelectorAll("#appt-tasks-list .appt-task-cb")].map(cb => ({
-          id: cb.dataset.taskId,
-          name: cb.dataset.taskName,
-          minutes: parseInt(cb.dataset.taskMinutes, 10) || 0,
-          completed: cb.checked,
-        }))
+      ? (() => {
+          // Preserve existing completion data if editing a completed appt
+          if (state.editingAppointmentId) {
+            const existing = state.appointments.find(a => a.id === state.editingAppointmentId);
+            if (existing && existing.status === "completed" && existing.scheduledTasks && existing.scheduledTasks.length > 0) {
+              return existing.scheduledTasks;
+            }
+          }
+          return [...document.querySelectorAll("#appt-tasks-list .work-order-task")].map(el => ({
+            id: el.dataset.taskId,
+            name: el.dataset.taskName,
+            minutes: parseInt(el.dataset.taskMinutes, 10) || 0,
+            completed: false,
+          }));
+        })()
       : [],
     title: "", recurrence, recurrenceEndDate,
   };
@@ -3053,6 +3061,71 @@ document.getElementById("btn-delete-appointment").addEventListener("click", asyn
   await dbDeleteAppointment(state.editingAppointmentId);
   state.appointments = state.appointments.filter(a => a.id !== state.editingAppointmentId);
   closeModal("modal-appointment");
+  refreshApptContext();
+});
+
+// ── Complete Appointment ──────────────────────────────────
+function openCompleteAppointmentModal(apptId) {
+  const a = state.appointments.find(x => x.id === apptId);
+  if (!a) return;
+  state.completingAppointmentId = apptId;
+
+  // Meta line
+  const cust = a.customerId ? state.customers.find(c => c.id === a.customerId) : null;
+  const tech = a.technicianId ? state.technicians.find(t => t.id === a.technicianId) : null;
+  const metaParts = [];
+  if (a.date) metaParts.push(formatApptDate(a.date));
+  if (cust) metaParts.push(`${cust.firstName} ${cust.lastName}`);
+  if (tech) metaParts.push(`Tech: ${tech.firstName} ${tech.lastName}`);
+  document.getElementById("complete-appt-meta").textContent = metaParts.join(" \u00b7 ");
+
+  // Period label
+  const period = getPeriodFromDate(a.date);
+  document.getElementById("complete-appt-period").textContent = period ? `(${period})` : "";
+
+  // Task checkboxes
+  const listEl = document.getElementById("complete-appt-tasks-list");
+  const section = document.getElementById("complete-appt-tasks-section");
+  if (a.scheduledTasks && a.scheduledTasks.length > 0) {
+    listEl.innerHTML = a.scheduledTasks.map(t => `
+      <label class="work-order-task">
+        <input type="checkbox" class="complete-task-cb" data-task-id="${t.id}" data-task-name="${escapeHtml(t.name)}" data-task-minutes="${t.minutes || 0}" ${t.completed !== false ? "checked" : ""} />
+        <span class="work-order-task__name">${escapeHtml(t.name)}</span>
+        <span class="work-order-task__min">${t.minutes || 0}m</span>
+      </label>`).join("");
+    section.style.display = "";
+  } else {
+    listEl.innerHTML = `<p class="work-order-empty">No scheduled tasks for this appointment.</p>`;
+    section.style.display = "";
+  }
+
+  document.getElementById("complete-appt-additional-work").value = a.additionalWork || "";
+  openModal("modal-complete-appt");
+}
+
+document.getElementById("form-complete-appt").addEventListener("submit", async e => {
+  e.preventDefault();
+  const apptId = state.completingAppointmentId;
+  if (!apptId) return;
+  const idx = state.appointments.findIndex(x => x.id === apptId);
+  if (idx === -1) return;
+
+  const scheduledTasks = [...document.querySelectorAll("#complete-appt-tasks-list .complete-task-cb")].map(cb => ({
+    id: cb.dataset.taskId,
+    name: cb.dataset.taskName,
+    minutes: parseInt(cb.dataset.taskMinutes, 10) || 0,
+    completed: cb.checked,
+  }));
+  const additionalWork = document.getElementById("complete-appt-additional-work").value.trim();
+
+  state.appointments[idx] = {
+    ...state.appointments[idx],
+    status: "completed",
+    scheduledTasks,
+    additionalWork,
+  };
+  await dbUpdateAppointment(state.appointments[idx]);
+  closeModal("modal-complete-appt");
   refreshApptContext();
 });
 

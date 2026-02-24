@@ -1299,6 +1299,20 @@ textarea::placeholder {
   align-self: center;
 }
 
+.btn--complete {
+  font-size: 0.78rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 6px;
+  border: 1px solid #16a34a;
+  background: #f0fdf4;
+  color: #15803d;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn--complete:hover {
+  background: #dcfce7;
+}
+
 .appt-cust-link {
   color: var(--accent);
   text-decoration: none;

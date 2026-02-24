@@ -910,10 +910,6 @@
               <span class="work-order-period" id="appt-work-order-period"></span>
             </div>
             <div id="appt-tasks-list" class="appt-tasks-list"></div>
-            <label style="margin-top:0.75rem;display:block;">
-              Additional Work Performed
-              <textarea id="appt-additional-work" rows="2" placeholder="Anything done that wasn't on the scheduled task list..."></textarea>
-            </label>
           </div>
           <label>
             Repeat
@@ -978,6 +974,38 @@
           <button type="submit">Save</button>
           <button type="button" id="btn-delete-avail-override" class="ghost danger" style="display:none;">Delete</button>
           <button type="button" class="ghost" data-close="modal-avail-override">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ── Complete Appointment Modal ─────────────────── -->
+  <div class="modal-overlay" id="modal-complete-appt" style="display:none;">
+    <div class="modal" style="max-width:480px;">
+      <div class="modal__header">
+        <h2 id="modal-complete-appt-title">Complete Appointment</h2>
+        <button type="button" class="modal__close" data-close="modal-complete-appt">&times;</button>
+      </div>
+      <form id="form-complete-appt">
+        <div class="form-grid">
+          <div class="span-2">
+            <p id="complete-appt-meta" style="font-size:0.85rem;color:var(--muted);margin:0 0 0.75rem;"></p>
+          </div>
+          <div class="span-2" id="complete-appt-tasks-section">
+            <div class="work-order-header">
+              <span class="work-order-title">📋 Tasks Completed?</span>
+              <span class="work-order-period" id="complete-appt-period"></span>
+            </div>
+            <div id="complete-appt-tasks-list"></div>
+          </div>
+          <label class="span-2">
+            Additional Work Performed
+            <textarea id="complete-appt-additional-work" rows="3" placeholder="Anything done that wasn't on the scheduled task list..."></textarea>
+          </label>
+        </div>
+        <div class="modal__actions">
+          <button type="submit">Save &amp; Complete</button>
+          <button type="button" class="ghost" data-close="modal-complete-appt">Cancel</button>
         </div>
       </form>
     </div>
