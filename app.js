@@ -285,6 +285,7 @@ function appointmentFromDb(row) {
     id: row.id,
     technicianId: row.technician_id || null,
     customerId: row.customer_id || null,
+    prospectId: row.prospect_id || null,
     type: row.type,
     title: row.title || "",
     notes: row.notes || "",
@@ -302,6 +303,7 @@ function appointmentToDb(a) {
   return {
     technician_id: a.technicianId || null,
     customer_id: a.customerId || null,
+    prospect_id: a.prospectId || null,
     type: a.type,
     title: a.title || null,
     notes: a.notes || null,
@@ -2152,6 +2154,7 @@ function formatApptDate(iso) {
 function appointmentCardHtml(a, opts = {}) {
   const tech = a.technicianId ? state.technicians.find(t => t.id === a.technicianId) : null;
   const cust = a.customerId ? state.customers.find(c => c.id === a.customerId) : null;
+  const prospect = a.prospectId ? state.prospects.find(p => p.id === a.prospectId) : null;
   const typeLabel = APPT_TYPE_LABELS[a.type] || a.type;
   const timeStr = a.startTime ? formatTime(a.startTime) + (a.endTime ? ` \u2013 ${formatTime(a.endTime)}` : "") : "Time TBD";
   const statusClass = a.status === "completed" ? "completed" : a.status === "cancelled" ? "cancelled" : "scheduled";
@@ -2163,6 +2166,7 @@ function appointmentCardHtml(a, opts = {}) {
           <span>\uD83D\uDD50 ${escapeHtml(timeStr)}</span>
           ${!opts.hideTech && tech ? `<span>\uD83D\uDD27 ${escapeHtml(tech.firstName)} ${escapeHtml(tech.lastName)}</span>` : ""}
           ${!opts.hideCust && cust ? `<span>\uD83D\uDC64 <a class="appt-cust-link" data-cust-id="${cust.id}" href="#">${escapeHtml(cust.firstName)} ${escapeHtml(cust.lastName)}</a></span>` : ""}
+          ${!opts.hideCust && prospect ? `<span>\uD83D\uDC64 <a class="appt-prospect-link" data-prospect-id="${prospect.id}" href="#">${escapeHtml(prospect.firstName)} ${escapeHtml(prospect.lastName)}</a> <span class="badge--prospect">Prospect</span></span>` : ""}
           ${a.notes ? `<span class="appt-notes-preview">\uD83D\uDCAC ${escapeHtml(a.notes)}</span>` : ""}
         </div>
       </div>
@@ -2176,12 +2180,14 @@ function appointmentCardHtml(a, opts = {}) {
 
 function appointmentPillHtml(a) {
   const cust = a.customerId ? state.customers.find(c => c.id === a.customerId) : null;
+  const prospect = a.prospectId ? state.prospects.find(p => p.id === a.prospectId) : null;
+  const contact = cust || prospect;
   const tech = a.technicianId ? state.technicians.find(t => t.id === a.technicianId) : null;
   const statusClass = a.status === "completed" ? "completed" : a.status === "cancelled" ? "cancelled" : "scheduled";
   const line1 = a.startTime ? formatTime(a.startTime) : "TBD";
-  const line2 = cust ? `${escapeHtml(cust.firstName)} ${escapeHtml(cust.lastName)}` : (APPT_TYPE_LABELS[a.type] || a.type).replace(/^\S+\s/, "");
+  const line2 = contact ? `${escapeHtml(contact.firstName)} ${escapeHtml(contact.lastName)}${prospect ? " \u2605" : ""}` : (APPT_TYPE_LABELS[a.type] || a.type).replace(/^\S+\s/, "");
   const line3 = tech ? `${escapeHtml(tech.firstName)} ${escapeHtml(tech.lastName)}` : "";
-  const tooltip = `${(APPT_TYPE_LABELS[a.type]||a.type).replace(/^\S+\s/,'')}${cust ? ' \u2014 '+cust.firstName+' '+cust.lastName : ''}${tech ? ' \u00b7 '+tech.firstName+' '+tech.lastName : ''}${a.startTime ? ' @ '+formatTime(a.startTime) : ''}`;
+  const tooltip = `${(APPT_TYPE_LABELS[a.type]||a.type).replace(/^\S+\s/,'')}${contact ? ' \u2014 '+contact.firstName+' '+contact.lastName+(prospect?' (Prospect)':'') : ''}${tech ? ' \u00b7 '+tech.firstName+' '+tech.lastName : ''}${a.startTime ? ' @ '+formatTime(a.startTime) : ''}`;
   return `<div class="cal-week-pill cal-week-pill--${escapeHtml(a.type)} appt-status--${statusClass}" data-appt-id="${a.id}" title="${escapeHtml(tooltip)}">
     <span class="cal-week-pill__time">${line1}</span>
     <span class="cal-week-pill__name">${line2}</span>
@@ -2194,6 +2200,12 @@ function bindApptEvents(containerEl) {
     link.addEventListener("click", e => {
       e.preventDefault();
       openCustomer(link.dataset.custId);
+    });
+  });
+  containerEl.querySelectorAll(".appt-prospect-link").forEach(link => {
+    link.addEventListener("click", e => {
+      e.preventDefault();
+      openProspect(link.dataset.prospectId);
     });
   });
   containerEl.querySelectorAll(".appt-edit-btn").forEach(btn => {
@@ -2753,20 +2765,40 @@ function populateApptDropdowns() {
     state.technicians.filter(t => t.status === "active").map(t =>
       `<option value="${t.id}">${escapeHtml(t.firstName)} ${escapeHtml(t.lastName)}</option>`
     ).join("");
-  const custSel = document.getElementById("appt-customer");
-  custSel.innerHTML = `<option value="">-- No customer linked --</option>` +
-    [...state.customers]
-      .sort((a, b) => `${a.lastName}${a.firstName}`.localeCompare(`${b.lastName}${b.firstName}`))
-      .map(c => `<option value="${c.id}">${escapeHtml(c.lastName)}, ${escapeHtml(c.firstName)}${c.customerNumber ? ` (${c.customerNumber})` : ""}</option>`)
-      .join("");
 }
+
+function refreshApptContactDropdown(type, preserveValue = null) {
+  const labelText = document.getElementById("appt-contact-text");
+  const sel = document.getElementById("appt-customer");
+  if (type === "consult") {
+    if (labelText) labelText.textContent = "Prospect";
+    sel.innerHTML = `<option value="">-- No prospect linked --</option>` +
+      [...state.prospects]
+        .sort((a, b) => `${a.lastName}${a.firstName}`.localeCompare(`${b.lastName}${b.firstName}`))
+        .map(p => `<option value="${p.id}">${escapeHtml(p.lastName)}, ${escapeHtml(p.firstName)}</option>`)
+        .join("");
+  } else {
+    if (labelText) labelText.textContent = "Customer";
+    sel.innerHTML = `<option value="">-- No customer linked --</option>` +
+      [...state.customers]
+        .sort((a, b) => `${a.lastName}${a.firstName}`.localeCompare(`${b.lastName}${b.firstName}`))
+        .map(c => `<option value="${c.id}">${escapeHtml(c.lastName)}, ${escapeHtml(c.firstName)}${c.customerNumber ? ` (${c.customerNumber})` : ""}</option>`)
+        .join("");
+  }
+  if (preserveValue) sel.value = preserveValue;
+}
+
+document.getElementById("appt-type").addEventListener("change", () => {
+  refreshApptContactDropdown(document.getElementById("appt-type").value);
+});
 
 function openAppointmentModal(defaults = {}) {
   state.editingAppointmentId = null;
   document.getElementById("modal-appointment-title").textContent = "Schedule Appointment";
   document.getElementById("btn-delete-appointment").style.display = "none";
   populateApptDropdowns();
-  document.getElementById("appt-type").value = defaults.type || "maintenance";
+  const newType = defaults.type || "maintenance";
+  document.getElementById("appt-type").value = newType;
   document.getElementById("appt-status").value = "scheduled";
   document.getElementById("appt-date").value = defaults.date || new Date().toISOString().slice(0, 10);
   document.getElementById("appt-start-time").value = defaults.startTime || "09:00";
@@ -2776,7 +2808,8 @@ function openAppointmentModal(defaults = {}) {
   document.getElementById("appt-recurrence-end").value = "";
   toggleRecurrenceEnd();
   document.getElementById("appt-technician").value = defaults.technicianId || "";
-  document.getElementById("appt-customer").value = defaults.customerId || "";
+  const contactId = newType === "consult" ? (defaults.prospectId || "") : (defaults.customerId || "");
+  refreshApptContactDropdown(newType, contactId);
   openModal("modal-appointment");
 }
 
@@ -2787,7 +2820,8 @@ function openEditAppointmentModal(apptId) {
   document.getElementById("modal-appointment-title").textContent = "Edit Appointment";
   document.getElementById("btn-delete-appointment").style.display = "inline-block";
   populateApptDropdowns();
-  document.getElementById("appt-type").value = a.type || "maintenance";
+  const editType = a.type || "maintenance";
+  document.getElementById("appt-type").value = editType;
   document.getElementById("appt-status").value = a.status || "scheduled";
   document.getElementById("appt-date").value = a.date || "";
   document.getElementById("appt-start-time").value = a.startTime || "";
@@ -2803,7 +2837,8 @@ function openEditAppointmentModal(apptId) {
   document.getElementById("appt-recurrence-end").value = a.recurrenceEndDate || "";
   toggleRecurrenceEnd();
   document.getElementById("appt-technician").value = a.technicianId || "";
-  document.getElementById("appt-customer").value = a.customerId || "";
+  const editContactId = editType === "consult" ? (a.prospectId || "") : (a.customerId || "");
+  refreshApptContactDropdown(editType, editContactId);
   openModal("modal-appointment");
 }
 
@@ -2879,13 +2914,16 @@ document.getElementById("form-appointment").addEventListener("submit", async e =
   const endTime = startTime ? addMinutesToTime(startTime, duration) : null;
   const recurrence = document.getElementById("appt-recurrence").value || null;
   const recurrenceEndDate = document.getElementById("appt-recurrence-end").value || null;
+  const apptType = document.getElementById("appt-type").value;
+  const contactId = document.getElementById("appt-customer").value || null;
   const base = {
-    type: document.getElementById("appt-type").value,
+    type: apptType,
     status: document.getElementById("appt-status").value,
     date: document.getElementById("appt-date").value,
     startTime, endTime,
     technicianId: document.getElementById("appt-technician").value || null,
-    customerId: document.getElementById("appt-customer").value || null,
+    customerId: apptType === "consult" ? null : contactId,
+    prospectId: apptType === "consult" ? contactId : null,
     notes: document.getElementById("appt-notes").value.trim(),
     title: "", recurrence, recurrenceEndDate,
   };
