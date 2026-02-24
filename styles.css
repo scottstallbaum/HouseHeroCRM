@@ -1299,6 +1299,17 @@ textarea::placeholder {
   align-self: center;
 }
 
+.appt-schedule-link {
+  font-size: 0.72rem;
+  color: var(--accent);
+  text-decoration: none;
+  align-self: center;
+  white-space: nowrap;
+}
+.appt-schedule-link:hover {
+  text-decoration: underline;
+}
+
 .btn--complete {
   font-size: 0.78rem;
   padding: 0.25rem 0.6rem;

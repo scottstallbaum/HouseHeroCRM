@@ -507,6 +507,15 @@ function renderCustomerList(filter = "") {
 searchInput.addEventListener("input", () => renderCustomerList(searchInput.value));
 
 // ── Open Customer Detail ───────────────────────────────────
+function openCustomerToSchedule(id) {
+  openCustomer(id);
+  // Scroll to schedule section after render
+  requestAnimationFrame(() => {
+    const el = document.getElementById("schedule-section");
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+}
+
 function openCustomer(id) {
   state.currentCustomerId = id;
   const c = getCustomer(id);
@@ -2231,6 +2240,12 @@ function bindApptEvents(containerEl) {
   containerEl.querySelectorAll(".appt-complete-btn").forEach(btn => {
     btn.addEventListener("click", () => openCompleteAppointmentModal(btn.dataset.apptId));
   });
+  containerEl.querySelectorAll(".appt-schedule-link").forEach(link => {
+    link.addEventListener("click", e => {
+      e.preventDefault();
+      openCustomerToSchedule(link.dataset.custId);
+    });
+  });
   containerEl.querySelectorAll(".appt-delete-btn").forEach(btn => {
     btn.addEventListener("click", async () => {
       if (!confirm("Delete this appointment?")) return;
@@ -3041,6 +3056,34 @@ document.getElementById("form-appointment").addEventListener("submit", async e =
       const msg = unique.length === 1
         ? `Availability conflict:\n\n${unique[0]}\n\nSchedule anyway?`
         : `Availability conflicts on ${conflicts.length} date(s):\n\n${unique.slice(0, 5).join("\n")}${unique.length > 5 ? `\n\u2026and ${unique.length - 5} more` : ""}\n\nSchedule anyway?`;
+      if (!confirm(msg)) return;
+    }
+  }
+
+  // ── Double-booking check ─────────────────────────────────
+  if (base.technicianId && base.startTime && base.endTime) {
+    const dates = recurrence
+      ? generateRecurringDates(base.date, recurrence, recurrenceEndDate)
+      : [base.date];
+    const doubles = [];
+    for (const date of dates) {
+      const overlapping = state.appointments.filter(a =>
+        a.id !== state.editingAppointmentId &&
+        a.technicianId === base.technicianId &&
+        a.date === date &&
+        a.status !== "cancelled" &&
+        a.startTime && a.endTime &&
+        a.startTime < base.endTime &&
+        a.endTime > base.startTime
+      );
+      overlapping.forEach(a => {
+        const cust = a.customerId ? state.customers.find(c => c.id === a.customerId) : null;
+        const name = cust ? `${cust.firstName} ${cust.lastName}` : "another customer";
+        doubles.push(`${date}: overlaps with ${APPT_TYPE_LABELS[a.type] || a.type} for ${name} (${formatTime(a.startTime)}\u2013${formatTime(a.endTime)})`);
+      });
+    }
+    if (doubles.length > 0) {
+      const msg = `Double-booking warning:\n\n${doubles.slice(0, 5).join("\n")}${doubles.length > 5 ? `\n\u2026and ${doubles.length - 5} more` : ""}\n\nSchedule anyway?`;
       if (!confirm(msg)) return;
     }
   }
