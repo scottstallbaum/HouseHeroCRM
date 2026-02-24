@@ -1146,6 +1146,7 @@ document.getElementById("btn-followups-due").addEventListener("click", () => {
 });
 
 document.getElementById("prospect-search-input").addEventListener("input", () => renderProspectList());
+document.getElementById("prospect-source-filter").addEventListener("change", () => renderProspectList());
 
 // ── Render Prospect List ───────────────────────────────────
 const STAGE_LABELS = {
@@ -1226,12 +1227,15 @@ function renderProspectList() {
   }
 
   const q = document.getElementById("prospect-search-input").value.toLowerCase();
+  const sourceFilter = document.getElementById("prospect-source-filter").value;
   const filtered = state.prospects.filter(p => {
     const nameMatch = `${p.firstName} ${p.lastName}`.toLowerCase().includes(q) ||
       getProspectAddress(p).toLowerCase().includes(q) ||
-      (p.phone || "").toLowerCase().includes(q);
+      (p.phone || "").toLowerCase().includes(q) ||
+      (p.email || "").toLowerCase().includes(q);
     const stageMatch = stage === "all" || p.stage === stage;
-    return nameMatch && stageMatch;
+    const sourceMatch = !sourceFilter || p.source === sourceFilter;
+    return nameMatch && stageMatch && sourceMatch;
   });
 
   const listEl = document.getElementById("prospect-list");
@@ -1726,7 +1730,7 @@ function renderScheduleCard(customerId) {
     // Build period → completed appointment map
     const completedByPeriod = {};
     state.appointments
-      .filter(a => a.customerId === customerId && a.type === "maintenance" && a.status === "completed" && a.date)
+      .filter(a => a.customerId === customerId && a.type === "maintenance" && a.status === "completed" && a.date && a.date.startsWith(SCHEDULE_YEAR))
       .forEach(a => {
         const period = getPeriodFromDate(a.date);
         if (period && !completedByPeriod[period]) completedByPeriod[period] = a;
