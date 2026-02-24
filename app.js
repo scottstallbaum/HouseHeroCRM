@@ -1450,6 +1450,61 @@ document.getElementById("btn-add-prospect").addEventListener("click", () => {
   openModal("modal-prospect");
 });
 
+document.getElementById("btn-delete-prospect").addEventListener("click", async () => {
+  const p = getProspect(state.currentProspectId);
+  if (!p) return;
+  if (!confirm(`Delete ${p.firstName} ${p.lastName}? This cannot be undone.`)) return;
+  await dbDeleteProspect(p.id);
+  state.prospects = state.prospects.filter(x => x.id !== p.id);
+  document.getElementById("view-prospect-detail").style.display = "none";
+  document.getElementById("view-prospects").style.display = "block";
+  state.currentProspectId = null;
+  renderProspectList();
+});
+
+document.getElementById("btn-convert-prospect").addEventListener("click", async () => {
+  const p = getProspect(state.currentProspectId);
+  if (!p) return;
+  if (!confirm(`Convert ${p.firstName} ${p.lastName} to a customer? Their appointments will be moved to the new customer profile.`)) return;
+
+  const newCustomer = await dbInsertCustomer({
+    firstName: p.firstName,
+    lastName: p.lastName,
+    street: p.street || "",
+    city: p.city || "",
+    state: p.state || "",
+    zip: p.zip || "",
+    email: p.email || "",
+    phone: p.phone || "",
+    status: "active",
+    secondary: p.secondary || null,
+    notes: p.notes || [],
+    minutesLimit: 75,
+  });
+  if (!newCustomer) return;
+  state.customers.unshift(newCustomer);
+
+  // Re-link prospect appointments to the new customer
+  const prospectAppts = state.appointments.filter(a => a.prospectId === p.id);
+  for (const a of prospectAppts) {
+    const idx = state.appointments.findIndex(x => x.id === a.id);
+    state.appointments[idx] = { ...a, customerId: newCustomer.id, prospectId: null };
+    await dbUpdateAppointment(state.appointments[idx]);
+  }
+
+  // Mark prospect as won
+  p.stage = "won";
+  await dbUpdateProspect(p);
+  const pi = state.prospects.findIndex(x => x.id === p.id);
+  if (pi !== -1) state.prospects[pi] = p;
+
+  // Navigate to new customer profile
+  document.getElementById("view-prospect-detail").style.display = "none";
+  state.currentProspectId = null;
+  state.returnTo = null;
+  openCustomer(newCustomer.id);
+});
+
 document.getElementById("btn-edit-prospect").addEventListener("click", () => {
   const p = getProspect(state.currentProspectId);
   if (!p) return;
@@ -2909,14 +2964,25 @@ function refreshMaintenanceTaskList() {
 document.getElementById("appt-customer").addEventListener("change", refreshMaintenanceTaskList);
 document.getElementById("appt-date").addEventListener("change", refreshMaintenanceTaskList);
 
+function filterApptTypeOptions(isProspect) {
+  document.getElementById("appt-type").querySelectorAll("option").forEach(opt => {
+    if (isProspect) {
+      opt.hidden = ["maintenance", "work_order"].includes(opt.value);
+    } else {
+      opt.hidden = false;
+    }
+  });
+}
+
 function openAppointmentModal(defaults = {}) {
   state.editingAppointmentId = null;
   document.getElementById("modal-appointment-title").textContent = "Schedule Appointment";
   document.getElementById("btn-delete-appointment").style.display = "none";
   document.getElementById("btn-complete-appointment").style.display = "none";
   populateApptDropdowns();
-  const newType = defaults.type || "maintenance";
+  const newType = defaults.type || (state.apptContext === "prospect" ? "consult" : "maintenance");
   document.getElementById("appt-type").value = newType;
+  filterApptTypeOptions(state.apptContext === "prospect");
   document.getElementById("appt-status").value = "scheduled";
   document.getElementById("appt-date").value = defaults.date || new Date().toISOString().slice(0, 10);
   document.getElementById("appt-start-time").value = defaults.startTime || "09:00";
@@ -2944,6 +3010,7 @@ function openEditAppointmentModal(apptId) {
   populateApptDropdowns();
   const editType = a.type || "maintenance";
   document.getElementById("appt-type").value = editType;
+  filterApptTypeOptions(!!(a.prospectId));
   document.getElementById("appt-status").value = a.status || "scheduled";
   document.getElementById("appt-date").value = a.date || "";
   document.getElementById("appt-start-time").value = a.startTime || "";
