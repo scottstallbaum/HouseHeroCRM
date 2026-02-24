@@ -2216,7 +2216,7 @@ function appointmentCardHtml(a, opts = {}) {
       </div>
       <div style="display:flex;align-items:center;gap:0.5rem;flex-shrink:0;">
         <span class="customer-card__badge badge--${statusClass}">${a.status || "scheduled"}</span>
-        ${a.type === "maintenance" && a.status !== "completed" && a.status !== "cancelled" ? `<button class="btn--complete appt-complete-btn" data-appt-id="${a.id}" type="button">\u2705 Complete</button>` : ""}
+        ${a.status !== "completed" && a.status !== "cancelled" ? `<button class="btn--complete appt-complete-btn" data-appt-id="${a.id}" type="button">\u2705 Complete</button>` : ""}
         <button class="ghost ghost--small appt-edit-btn" data-appt-id="${a.id}" type="button">Edit</button>
         <button class="ghost danger icon-btn appt-delete-btn" data-appt-id="${a.id}" type="button">\u2715</button>
       </div>
@@ -2940,7 +2940,7 @@ function openEditAppointmentModal(apptId) {
   document.getElementById("btn-delete-appointment").style.display = "inline-block";
   // Show Complete button only for non-completed maintenance appointments
   const completeBtn = document.getElementById("btn-complete-appointment");
-  completeBtn.style.display = (a.type === "maintenance" && a.status !== "completed" && a.status !== "cancelled") ? "inline-block" : "none";
+  completeBtn.style.display = (a.status !== "completed" && a.status !== "cancelled") ? "inline-block" : "none";
   populateApptDropdowns();
   const editType = a.type || "maintenance";
   document.getElementById("appt-type").value = editType;
@@ -3155,10 +3155,12 @@ function openCompleteAppointmentModal(apptId) {
 
   // Meta line
   const cust = a.customerId ? state.customers.find(c => c.id === a.customerId) : null;
+  const prospect = a.prospectId ? state.prospects.find(p => p.id === a.prospectId) : null;
   const tech = a.technicianId ? state.technicians.find(t => t.id === a.technicianId) : null;
   const metaParts = [];
   if (a.date) metaParts.push(formatApptDate(a.date));
   if (cust) metaParts.push(`${cust.firstName} ${cust.lastName}`);
+  if (prospect) metaParts.push(`${prospect.firstName} ${prospect.lastName} (Prospect)`);
   if (tech) metaParts.push(`Tech: ${tech.firstName} ${tech.lastName}`);
   document.getElementById("complete-appt-meta").textContent = metaParts.join(" \u00b7 ");
 
@@ -3178,8 +3180,7 @@ function openCompleteAppointmentModal(apptId) {
       </label>`).join("");
     section.style.display = "";
   } else {
-    listEl.innerHTML = `<p class="work-order-empty">No scheduled tasks for this appointment.</p>`;
-    section.style.display = "";
+    section.style.display = "none";
   }
 
   document.getElementById("complete-appt-additional-work").value = a.additionalWork || "";
