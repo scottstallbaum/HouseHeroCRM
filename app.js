@@ -2868,6 +2868,7 @@ function openAppointmentModal(defaults = {}) {
   state.editingAppointmentId = null;
   document.getElementById("modal-appointment-title").textContent = "Schedule Appointment";
   document.getElementById("btn-delete-appointment").style.display = "none";
+  document.getElementById("btn-complete-appointment").style.display = "none";
   populateApptDropdowns();
   const newType = defaults.type || "maintenance";
   document.getElementById("appt-type").value = newType;
@@ -2893,6 +2894,9 @@ function openEditAppointmentModal(apptId) {
   state.editingAppointmentId = apptId;
   document.getElementById("modal-appointment-title").textContent = "Edit Appointment";
   document.getElementById("btn-delete-appointment").style.display = "inline-block";
+  // Show Complete button only for non-completed maintenance appointments
+  const completeBtn = document.getElementById("btn-complete-appointment");
+  completeBtn.style.display = (a.type === "maintenance" && a.status !== "completed" && a.status !== "cancelled") ? "inline-block" : "none";
   populateApptDropdowns();
   const editType = a.type || "maintenance";
   document.getElementById("appt-type").value = editType;
@@ -3054,6 +3058,13 @@ document.getElementById("form-appointment").addEventListener("submit", async e =
   }
   closeModal("modal-appointment");
   refreshApptContext();
+});
+
+document.getElementById("btn-complete-appointment").addEventListener("click", () => {
+  const apptId = state.editingAppointmentId;
+  if (!apptId) return;
+  closeModal("modal-appointment");
+  openCompleteAppointmentModal(apptId);
 });
 
 document.getElementById("btn-delete-appointment").addEventListener("click", async () => {
