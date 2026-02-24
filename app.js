@@ -2286,7 +2286,7 @@ function renderAppointmentList(appointments, containerEl, opts = {}) {
     if (!byDate[a.date]) byDate[a.date] = [];
     byDate[a.date].push(a);
   });
-  const sortedDates = Object.keys(byDate).sort();
+  const sortedDates = Object.keys(byDate).sort(opts.descending ? (a, b) => b.localeCompare(a) : undefined);
   containerEl.innerHTML = sortedDates.map(date => {
     const cards = byDate[date]
       .sort((a, b) => (a.startTime || "99:99").localeCompare(b.startTime || "99:99"))
@@ -2317,7 +2317,7 @@ function renderProspectAppointments(prospectId) {
   const appts = state.appointments
     .filter(a => a.prospectId === prospectId)
     .sort((a, b) => b.date.localeCompare(a.date) || (b.startTime || "").localeCompare(a.startTime || ""));
-  renderAppointmentList(appts, containerEl, { hideCust: true });
+  renderAppointmentList(appts, containerEl, { hideCust: true, descending: true });
 }
 
 function renderCustomerAppointments(customerId) {
@@ -2326,7 +2326,7 @@ function renderCustomerAppointments(customerId) {
   const appts = state.appointments
     .filter(a => a.customerId === customerId)
     .sort((a, b) => a.date.localeCompare(b.date) || (a.startTime || "").localeCompare(b.startTime || ""));
-  renderAppointmentList(appts, containerEl, { hideCust: true });
+  renderAppointmentList(appts, containerEl, { hideCust: true, descending: true });
 }
 
 function renderTechnicianAppointments(technicianId) {
