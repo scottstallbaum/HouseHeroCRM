@@ -139,6 +139,74 @@ function escapeHtml(val) {
     .replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
+// ── Fuzzy Duplicate Detection ──────────────────────────────
+function jaroSimilarity(s1, s2) {
+  if (s1 === s2) return 1;
+  if (!s1.length || !s2.length) return 0;
+  const matchDist = Math.max(Math.floor(Math.max(s1.length, s2.length) / 2) - 1, 0);
+  const s1m = new Array(s1.length).fill(false);
+  const s2m = new Array(s2.length).fill(false);
+  let matches = 0;
+  for (let i = 0; i < s1.length; i++) {
+    const lo = Math.max(0, i - matchDist);
+    const hi = Math.min(i + matchDist + 1, s2.length);
+    for (let j = lo; j < hi; j++) {
+      if (s2m[j] || s1[i] !== s2[j]) continue;
+      s1m[i] = s2m[j] = true; matches++; break;
+    }
+  }
+  if (!matches) return 0;
+  let t = 0, k = 0;
+  for (let i = 0; i < s1.length; i++) {
+    if (!s1m[i]) continue;
+    while (!s2m[k]) k++;
+    if (s1[i] !== s2[k]) t++;
+    k++;
+  }
+  return (matches / s1.length + matches / s2.length + (matches - t / 2) / matches) / 3;
+}
+
+function jaroWinkler(s1, s2) {
+  const j = jaroSimilarity(s1, s2);
+  let p = 0;
+  for (let i = 0; i < Math.min(4, s1.length, s2.length); i++) {
+    if (s1[i] === s2[i]) p++; else break;
+  }
+  return j + p * 0.1 * (1 - j);
+}
+
+function normName(s)  { return (s || "").toLowerCase().replace(/[^a-z]/g, ""); }
+function normPhone(s) { return (s || "").replace(/\D/g, "").slice(-10); }
+function normEmail(s) { return (s || "").toLowerCase().trim(); }
+
+function dupScore(a, b) {
+  const aph = normPhone(a.phone), bph = normPhone(b.phone);
+  if (aph && bph && aph === bph) return { score: 1.0, reason: "matching phone number" };
+  const aem = normEmail(a.email), bem = normEmail(b.email);
+  if (aem && bem && aem === bem) return { score: 1.0, reason: "matching email address" };
+  const af = normName(a.firstName), al = normName(a.lastName);
+  const bf = normName(b.firstName), bl = normName(b.lastName);
+  const s1 = (jaroWinkler(af, bf) + jaroWinkler(al, bl)) / 2;
+  const s2 = (jaroWinkler(af, bl) + jaroWinkler(al, bf)) / 2;
+  const score = Math.max(s1, s2);
+  return score >= 0.85 ? { score, reason: "similar name" } : null;
+}
+
+function findDuplicates(candidate, excludeId, excludeType) {
+  const results = [];
+  const check = (list, type) => {
+    for (const rec of list) {
+      if (type === excludeType && rec.id === excludeId) continue;
+      const match = dupScore(candidate, rec);
+      if (match) results.push({ record: rec, score: match.score, reason: match.reason, type });
+    }
+  };
+  check(state.customers, "customer");
+  check(state.prospects, "prospect");
+  results.sort((a, b) => b.score - a.score);
+  return results;
+}
+
 function getCustomer(id) {
   return state.customers.find(c => c.id === id);
 }
@@ -856,6 +924,11 @@ document.getElementById("form-customer").addEventListener("submit", async e => {
       renderAccountHolders(state.customers[idx]);
     }
   } else {
+    const dupes = findDuplicates(data, null, null);
+    if (dupes.length > 0) {
+      const proceed = await showDuplicateModal(dupes);
+      if (!proceed) return;
+    }
     const newCustomer = await dbInsertCustomer({
       ...data,
       status: "active",
@@ -889,6 +962,33 @@ function openModal(id) {
 
 function closeModal(id) {
   document.getElementById(id).style.display = "none";
+}
+
+function showDuplicateModal(dupes) {
+  return new Promise(resolve => {
+    const listEl = document.getElementById("dup-check-list");
+    listEl.innerHTML = dupes.slice(0, 5).map(d => {
+      const r = d.record;
+      const typeBadge = d.type === "customer"
+        ? `<span class="badge badge--active" style="font-size:0.7rem;padding:0.1rem 0.5rem;">Customer</span>`
+        : `<span class="badge badge--new" style="font-size:0.7rem;padding:0.1rem 0.5rem;">Prospect</span>`;
+      const phone = r.phone ? `<span>📞 ${escapeHtml(r.phone)}</span>` : "";
+      const email = r.email ? `<span>✉️ ${escapeHtml(r.email)}</span>` : "";
+      const addr  = (r.street || r.city)
+        ? `<span>📍 ${escapeHtml([r.street, r.city, r.state].filter(Boolean).join(", "))}</span>` : "";
+      return `
+        <div class="dup-item">
+          <div class="dup-item__name">${escapeHtml(r.firstName)} ${escapeHtml(r.lastName)} ${typeBadge}</div>
+          <div class="dup-item__meta">${phone}${phone && email ? " " : ""}${email}${(phone || email) && addr ? " " : ""}${addr}</div>
+          <div class="dup-item__reason">⚠️ Flagged for: ${escapeHtml(d.reason)}</div>
+        </div>`;
+    }).join("");
+    const btnContinue = document.getElementById("btn-dup-continue");
+    const btnCancel   = document.getElementById("btn-dup-cancel");
+    btnContinue.onclick = () => { closeModal("modal-dup-check"); resolve(true); };
+    btnCancel.onclick   = () => { closeModal("modal-dup-check"); resolve(false); };
+    openModal("modal-dup-check");
+  });
 }
 
 document.querySelectorAll("[data-close]").forEach(btn => {
@@ -1636,6 +1736,11 @@ document.getElementById("form-prospect").addEventListener("submit", async e => {
       document.getElementById("prospect-detail-address").textContent = getProspectAddress(data);
     }
   } else {
+    const dupes = findDuplicates(data, null, null);
+    if (dupes.length > 0) {
+      const proceed = await showDuplicateModal(dupes);
+      if (!proceed) return;
+    }
     const newProspect = await dbInsertProspect({ ...data, notes: [] });
     if (newProspect) state.prospects.unshift(newProspect);
   }

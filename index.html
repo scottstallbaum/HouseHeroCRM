@@ -1038,6 +1038,22 @@
     </div>
   </div>
 
+  <!-- Duplicate Check Modal -->
+  <div id="modal-dup-check" class="modal" style="display:none;">
+    <div class="modal__box" style="max-width:500px;">
+      <div class="modal__header">
+        <h2>⚠️ Possible Duplicate</h2>
+        <button type="button" class="modal__close" data-close="modal-dup-check">✕</button>
+      </div>
+      <p style="margin:0 0 1rem;color:var(--text);">One or more existing records look similar. Review before saving:</p>
+      <div id="dup-check-list"></div>
+      <div class="modal__actions">
+        <button type="button" id="btn-dup-continue">Save Anyway</button>
+        <button type="button" class="ghost" id="btn-dup-cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="app.js"></script>
 </body>

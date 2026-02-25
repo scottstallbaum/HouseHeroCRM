@@ -751,6 +751,36 @@ textarea::placeholder {
   font-weight: 600;
 }
 
+/* ── Duplicate Check ──────────────────────────── */
+.dup-item {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.65rem 0.85rem;
+  margin-bottom: 0.6rem;
+  background: #fafaf9;
+}
+.dup-item__name {
+  font-weight: 600;
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 0.2rem;
+}
+.dup-item__meta {
+  font-size: 0.8rem;
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-bottom: 0.25rem;
+}
+.dup-item__reason {
+  font-size: 0.8rem;
+  color: #b45309;
+  font-weight: 500;
+}
+
 /*  Pipeline stage badges  */
 .badge--new       { background: #e3e8f0; color: #3a4a6b; }
 .badge--contacted { background: #dbeafe; color: #1d4ed8; }
