@@ -42,7 +42,12 @@
     </nav>
     <div class="sidebar__footer">
       <div class="sidebar__footer-text">House Hero LLC</div>
-      <div class="sidebar__footer-sub">PA Registered &amp; Insured</div>
+      <div class="sidebar__footer-sub">PA Registered & Insured</div>
+      <div class="sidebar__user" id="sidebar-user" style="display:none;">
+        <span class="sidebar__user-email" id="sidebar-user-email"></span>
+        <button type="button" id="btn-sign-out" class="btn-sign-out">Sign Out</button>
+        <button type="button" id="btn-change-password" class="btn-sign-out" style="margin-top:0.35rem;">Change Password</button>
+      </div>
     </div>
   </aside>
 
@@ -1051,6 +1056,83 @@
         <button type="button" id="btn-dup-continue">Save Anyway</button>
         <button type="button" class="ghost" id="btn-dup-cancel">Cancel</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Change Password Modal -->
+  <div id="modal-change-password" class="modal" style="display:none;">
+    <div class="modal__box" style="max-width:380px;">
+      <div class="modal__header">
+        <h2>Change Password</h2>
+        <button type="button" class="modal__close" data-close="modal-change-password">&times;</button>
+      </div>
+      <form id="form-change-password">
+        <div class="form-grid">
+          <label class="span-2">
+            New Password
+            <input type="password" id="change-pw-new" required minlength="8" autocomplete="new-password" placeholder="At least 8 characters" />
+          </label>
+          <label class="span-2">
+            Confirm Password
+            <input type="password" id="change-pw-confirm" required minlength="8" autocomplete="new-password" placeholder="Re-enter password" />
+          </label>
+          <div id="change-pw-error" class="span-2 login-error" style="display:none;"></div>
+        </div>
+        <div class="modal__actions">
+          <button type="submit" id="btn-change-pw-submit">Save Password</button>
+          <button type="button" class="ghost" data-close="modal-change-password">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Password Reset Screen -->
+  <div id="password-reset-screen" style="display:none;">
+    <div class="login-card">
+      <div class="login-brand">
+        <img src="logo.png" alt="House Hero" class="login-logo"
+          onerror="this.style.display='none'" />
+      </div>
+      <h1 class="login-title">Set Your Password</h1>
+      <form id="form-set-password">
+        <label class="login-label">
+          New Password
+          <input type="password" id="reset-password" required autocomplete="new-password" placeholder="At least 8 characters" minlength="8" />
+        </label>
+        <label class="login-label">
+          Confirm Password
+          <input type="password" id="reset-password-confirm" required autocomplete="new-password" placeholder="Re-enter password" minlength="8" />
+        </label>
+        <div id="reset-error" class="login-error" style="display:none;"></div>
+        <button type="submit" id="btn-reset-submit" class="login-btn">Save Password</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Login Screen Overlay -->
+  <div id="login-screen" style="display:none;">
+    <div class="login-card">
+      <div class="login-brand">
+        <img src="logo.png" alt="House Hero" class="login-logo"
+          onerror="this.style.display='none'; document.getElementById('login-brand-fallback').style.display='block'" />
+        <div id="login-brand-fallback" style="display:none">
+          <div class="login-brand__name">House Hero</div>
+          <div class="login-brand__sub">CRM</div>
+        </div>
+      </div>
+      <h1 class="login-title">Sign In</h1>
+      <form id="form-login">
+        <label class="login-label">
+          Email
+          <input type="email" id="login-email" required autocomplete="username" placeholder="you@example.com" />
+        </label>
+        <label class="login-label">
+          Password
+          <input type="password" id="login-password" required autocomplete="current-password" placeholder="••••••••" />
+        </label>
+        <div id="login-error" class="login-error" style="display:none;"></div>
+        <button type="submit" id="btn-login-submit" class="login-btn">Sign In</button>
+      </form>
     </div>
   </div>
 

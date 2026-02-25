@@ -518,7 +518,159 @@ async function init() {
   renderCustomerList();
 }
 
-init();
+// ── Auth ───────────────────────────────────────────────────
+let appInitialized = false;
+
+function showLoginScreen() {
+  document.getElementById("login-screen").style.display = "flex";
+  document.getElementById("sidebar-user").style.display = "none";
+}
+
+function hideLoginScreen(user) {
+  document.getElementById("login-screen").style.display = "none";
+  document.getElementById("sidebar-user-email").textContent = user.email;
+  document.getElementById("sidebar-user").style.display = "block";
+}
+
+function showPasswordResetScreen() {
+  document.getElementById("login-screen").style.display = "none";
+  document.getElementById("password-reset-screen").style.display = "flex";
+}
+
+function hidePasswordResetScreen() {
+  document.getElementById("password-reset-screen").style.display = "none";
+}
+
+// Gate app startup on auth state
+sb.auth.onAuthStateChange((event, session) => {
+  if (event === "PASSWORD_RECOVERY") {
+    showPasswordResetScreen();
+    return;
+  }
+  if (session) {
+    hideLoginScreen(session.user);
+    hidePasswordResetScreen();
+    if (!appInitialized) {
+      appInitialized = true;
+      init();
+    }
+  } else {
+    showLoginScreen();
+  }
+});
+
+// Also check session immediately on load (handles page refresh reliably)
+(async () => {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) {
+    hideLoginScreen(session.user);
+    if (!appInitialized) {
+      appInitialized = true;
+      init();
+    }
+  } else {
+    showLoginScreen();
+  }
+})();
+
+// Set password form
+document.getElementById("form-set-password").addEventListener("submit", async e => {
+  e.preventDefault();
+  const pw = document.getElementById("reset-password").value;
+  const pw2 = document.getElementById("reset-password-confirm").value;
+  const errEl = document.getElementById("reset-error");
+  const btn = document.getElementById("btn-reset-submit");
+
+  errEl.style.display = "none";
+
+  if (pw !== pw2) {
+    errEl.textContent = "Passwords do not match.";
+    errEl.style.display = "block";
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = "Saving…";
+
+  const { error } = await sb.auth.updateUser({ password: pw });
+
+  btn.disabled = false;
+  btn.textContent = "Save Password";
+
+  if (error) {
+    errEl.textContent = error.message;
+    errEl.style.display = "block";
+  } else {
+    hidePasswordResetScreen();
+    // Session is now active — app will load via onAuthStateChange
+  }
+});
+
+// Login form
+document.getElementById("form-login").addEventListener("submit", async e => {
+  e.preventDefault();
+  const email = document.getElementById("login-email").value.trim();
+  const password = document.getElementById("login-password").value;
+  const errEl = document.getElementById("login-error");
+  const btn = document.getElementById("btn-login-submit");
+
+  errEl.style.display = "none";
+  btn.disabled = true;
+  btn.textContent = "Signing in…";
+
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+
+  btn.disabled = false;
+  btn.textContent = "Sign In";
+
+  if (error) {
+    errEl.textContent = error.message;
+    errEl.style.display = "block";
+  }
+});
+
+// Sign out
+document.getElementById("btn-sign-out").addEventListener("click", async () => {
+  await sb.auth.signOut();
+  appInitialized = false;
+});
+
+// Change password
+document.getElementById("btn-change-password").addEventListener("click", () => {
+  document.getElementById("change-pw-new").value = "";
+  document.getElementById("change-pw-confirm").value = "";
+  document.getElementById("change-pw-error").style.display = "none";
+  openModal("modal-change-password");
+});
+
+document.getElementById("form-change-password").addEventListener("submit", async e => {
+  e.preventDefault();
+  const pw = document.getElementById("change-pw-new").value;
+  const pw2 = document.getElementById("change-pw-confirm").value;
+  const errEl = document.getElementById("change-pw-error");
+  const btn = document.getElementById("btn-change-pw-submit");
+
+  errEl.style.display = "none";
+  if (pw !== pw2) {
+    errEl.textContent = "Passwords do not match.";
+    errEl.style.display = "block";
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = "Saving…";
+  const { error } = await sb.auth.updateUser({ password: pw });
+  btn.disabled = false;
+  btn.textContent = "Save Password";
+
+  if (error) {
+    errEl.textContent = error.message;
+    errEl.style.display = "block";
+  } else {
+    closeModal("modal-change-password");
+    alert("Password updated successfully!");
+  }
+});
 
 // ── Customer List ──────────────────────────────────────────
 function renderCustomerList(filter = "") {
