@@ -3296,7 +3296,44 @@ function refreshMaintenanceTaskList() {
     <div class="work-order-task" data-task-id="${t.id}" data-task-name="${escapeHtml(t.name)}" data-task-minutes="${t.minutes || 0}">
       <span class="work-order-task__name">${escapeHtml(t.name)}</span>
       <span class="work-order-task__min">${t.minutes || 0}m</span>
+      <button type="button" class="ghost ghost--small appt-remove-task-btn" title="Remove Task" style="margin-left:0.5rem;">✕</button>
     </div>`).join("");
+
+  // Add remove handler
+  listEl.querySelectorAll('.appt-remove-task-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      const taskDiv = btn.closest('.work-order-task');
+      if (taskDiv) taskDiv.remove();
+    });
+  });
+
+  // Populate task library picker
+  const picker = document.getElementById('appt-task-library-picker');
+  if (picker) {
+    const allTasks = (state.globalTasks || []).map(t => `<option value="${t.id}">${escapeHtml(t.name)} (${t.minutes}m)</option>`).join("");
+    picker.innerHTML = `<option value="">-- Select task --</option>` + allTasks;
+  }
+
+  // Add task from library handler
+  const addBtn = document.getElementById('btn-add-task-to-appt');
+  if (addBtn && picker) {
+    addBtn.onclick = () => {
+      const taskId = picker.value;
+      if (!taskId) return;
+      const task = (state.globalTasks || []).find(t => t.id === taskId);
+      if (!task) return;
+      // Prevent duplicate
+      if ([...listEl.querySelectorAll('.work-order-task')].some(el => el.dataset.taskId === taskId)) return;
+      const div = document.createElement('div');
+      div.className = 'work-order-task';
+      div.dataset.taskId = task.id;
+      div.dataset.taskName = task.name;
+      div.dataset.taskMinutes = task.minutes;
+      div.innerHTML = `<span class="work-order-task__name">${escapeHtml(task.name)}</span><span class="work-order-task__min">${task.minutes}m</span><button type="button" class="ghost ghost--small appt-remove-task-btn" title="Remove Task" style="margin-left:0.5rem;">✕</button>`;
+      div.querySelector('.appt-remove-task-btn').onclick = () => div.remove();
+      listEl.appendChild(div);
+    };
+  }
 }
 
 // Re-run when customer or date changes
@@ -3334,6 +3371,9 @@ function openAppointmentModal(defaults = {}) {
   const contactId = (newType === "consult" || newType === "a_la_carte") ? (defaults.prospectId || "") : (defaults.customerId || "");
   refreshApptContactDropdown(newType, contactId);
   refreshMaintenanceTaskList();
+  // Clear additional task field
+  const addTaskInput = document.getElementById("appt-additional-task");
+  if (addTaskInput) addTaskInput.value = "";
   openModal("modal-appointment");
 }
 
@@ -3368,6 +3408,9 @@ function openEditAppointmentModal(apptId) {
   const editContactId = (editType === "consult" || editType === "a_la_carte") ? (a.prospectId || "") : (a.customerId || "");
   refreshApptContactDropdown(editType, editContactId);
   refreshMaintenanceTaskList();
+  // Set additional task field
+  const addTaskInput = document.getElementById("appt-additional-task");
+  if (addTaskInput) addTaskInput.value = a.additionalWork || "";
   openModal("modal-appointment");
 }
 
@@ -3454,7 +3497,7 @@ document.getElementById("form-appointment").addEventListener("submit", async e =
     customerId: (apptType === "consult" || apptType === "a_la_carte") ? null : contactId,
     prospectId: (apptType === "consult" || apptType === "a_la_carte") ? contactId : null,
     notes: document.getElementById("appt-notes").value.trim(),
-    additionalWork: "",
+    additionalWork: document.getElementById("appt-additional-task")?.value?.trim() || "",
     scheduledTasks: apptType === "maintenance"
       ? (() => {
           // Preserve existing completion data if editing a completed appt

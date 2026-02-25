@@ -941,6 +941,19 @@
               <span class="work-order-period" id="appt-work-order-period"></span>
             </div>
             <div id="appt-tasks-list" class="appt-tasks-list"></div>
+                    <!-- Add/Remove Tasks Controls -->
+                    <div id="appt-task-controls" style="margin-top:0.5rem;">
+                      <label style="display:block;margin-bottom:0.5rem;">
+                        Add Task from Library:
+                        <select id="appt-task-library-picker" style="min-width:180px;"></select>
+                        <button type="button" id="btn-add-task-to-appt" class="ghost ghost--small" style="margin-left:0.5rem;">+ Add</button>
+                      </label>
+                      <label style="display:block;margin-bottom:0.5rem;">
+                        Additional Task(s):
+                        <input type="text" id="appt-additional-task" placeholder="Describe any extra task..." style="width:100%;margin-top:0.25rem;" />
+                      </label>
+                      <small style="color:var(--muted);">Remove a task by clicking the X next to it below.</small>
+                    </div>
           </div>
           <label>
             Repeat
