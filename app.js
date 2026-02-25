@@ -489,6 +489,7 @@ function renderCustomerList(filter = "") {
           ${c.email ? `<span>&#9993; ${escapeHtml(c.email)}</span>` : ""}
           ${c.startDate ? `<span>&#128197; Since ${formatDate(c.startDate)}</span>` : ""}
           ${tech ? `<span>🔧 ${escapeHtml(tech.firstName)} ${escapeHtml(tech.lastName)}</span>` : ""}
+          ${(!c.phone || !c.email) ? `<span class="badge--warn">\u26a0\ufe0f ${!c.phone && !c.email ? "No phone or email" : !c.phone ? "No phone" : "No email"}</span>` : ""}
         </div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:0.4rem;">
@@ -543,6 +544,7 @@ function openCustomer(id) {
   renderNotes(c);
   openScheduleForCustomer(id);
   renderCustomerAppointments(id);
+  updateContactWarningBanner("customer-contact-warning", c.phone, c.email);
 
   document.getElementById("btn-back").textContent =
     state.returnTo === "technician" ? "← Back to technician" :
@@ -831,6 +833,11 @@ document.getElementById("form-customer").addEventListener("submit", async e => {
   };
   if (!data.secondary.firstName && !data.secondary.lastName) {
     data.secondary = null;
+  }
+
+  if (data.street && data.city && data.state && data.zip) {
+    const addrValid = await validateAddressWithCensus(data.street, data.city, data.state, data.zip);
+    if (addrValid === false && !confirm(`Address not verified: "${data.street}, ${data.city}, ${data.state} ${data.zip}"\n\nCheck for typos. Save anyway?`)) return;
   }
 
   if (state.editingCustomerId) {
@@ -1127,6 +1134,34 @@ function getProspectAddress(p) {
   return parts.length ? parts.join(", ") : "";
 }
 
+async function validateAddressWithCensus(street, city, stateAbbr, zip) {
+  try {
+    const params = new URLSearchParams({ street, city, state: stateAbbr, zip, benchmark: "2020", format: "json" });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
+    const res = await fetch(`https://geocoding.geo.census.gov/geocoder/locations/address?${params}`, { signal: controller.signal });
+    clearTimeout(timeoutId);
+    const payload = await res.json();
+    return (payload?.result?.addressMatches?.length ?? 0) > 0;
+  } catch {
+    return null; // timeout or network error — allow save
+  }
+}
+
+function updateContactWarningBanner(bannerId, phone, email) {
+  const el = document.getElementById(bannerId);
+  if (!el) return;
+  const missing = [];
+  if (!phone) missing.push("phone number");
+  if (!email) missing.push("email address");
+  if (missing.length) {
+    el.textContent = `\u26a0\ufe0f Missing contact info: ${missing.join(" and ")}`;
+    el.style.display = "";
+  } else {
+    el.style.display = "none";
+  }
+}
+
 // ── Pipeline Tabs ──────────────────────────────────────────
 document.getElementById("pipeline-tabs").addEventListener("click", e => {
   const tab = e.target.closest(".pipeline-tab");
@@ -1167,6 +1202,7 @@ function prospectCardHtml(p) {
           ${addr ? `<span>&#128205; ${escapeHtml(addr)}</span>` : ""}
           ${p.phone ? `<span>&#128222; ${escapeHtml(p.phone)}</span>` : ""}
           ${p.followUpDate ? `<span>&#128197; Follow-up: ${formatDate(p.followUpDate)}</span>` : ""}
+          ${(!p.phone || !p.email) ? `<span class="badge--warn">\u26a0\ufe0f ${!p.phone && !p.email ? "No phone or email" : !p.phone ? "No phone" : "No email"}</span>` : ""}
         </div>
       </div>
       <div><span class="customer-card__badge badge--${p.stage || "new"}">${stageLabel}</span></div>
@@ -1292,6 +1328,7 @@ function openProspect(id) {
   renderProspectNotes(p);
   renderProspectAppointments(id);
   loadAndRenderContactLog(id);
+  updateContactWarningBanner("prospect-contact-warning", p.phone, p.email);
   document.getElementById("view-prospects").style.display = "none";
   document.getElementById("view-prospect-detail").style.display = "block";
 }
@@ -1432,7 +1469,12 @@ document.getElementById("form-prospect-note").addEventListener("submit", async e
 document.getElementById("btn-save-prospect-status").addEventListener("click", async () => {
   const p = getProspect(state.currentProspectId);
   if (!p) return;
-  p.stage = document.getElementById("prospect-stage").value;
+  const newStage = document.getElementById("prospect-stage").value;
+  if (newStage === "won" && !confirm(`Setting stage to "Won" won't automatically create a customer record.\n\nUse the "\u2705 Convert to Customer" button to create the customer account. Continue?`)) {
+    document.getElementById("prospect-stage").value = p.stage || "new";
+    return;
+  }
+  p.stage = newStage;
   p.source = document.getElementById("prospect-source").value;
   p.lastContactDate = document.getElementById("prospect-last-contact").value;
   p.followUpDate = document.getElementById("prospect-followup").value;
@@ -1561,6 +1603,11 @@ document.getElementById("form-prospect").addEventListener("submit", async e => {
     followUpDate: document.getElementById("prospect-form-followup").value,
     secondary,
   };
+
+  if (data.street && data.city && data.state && data.zip) {
+    const addrValid = await validateAddressWithCensus(data.street, data.city, data.state, data.zip);
+    if (addrValid === false && !confirm(`Address not verified: "${data.street}, ${data.city}, ${data.state} ${data.zip}"\n\nCheck for typos. Save anyway?`)) return;
+  }
 
   if (state.editingProspectId) {
     const idx = state.prospects.findIndex(p => p.id === state.editingProspectId);
@@ -3202,6 +3249,32 @@ document.getElementById("form-appointment").addEventListener("submit", async e =
   }
   closeModal("modal-appointment");
   refreshApptContext();
+
+  // ── Prospect stage sync ──────────────────────────────────
+  const linkedProspectId = base.prospectId;
+  if (linkedProspectId) {
+    const stageOrder = ["new", "contacted", "follow-up", "consult_scheduled", "consultation", "proposal", "one_off", "won", "lost"];
+    const sp = getProspect(linkedProspectId);
+    if (sp) {
+      const curIdx = stageOrder.indexOf(sp.stage || "new");
+      let suggestedStage = null, suggestedLabel = null;
+      if (base.type === "consult" && base.status === "scheduled" && curIdx < stageOrder.indexOf("consult_scheduled")) {
+        suggestedStage = "consult_scheduled"; suggestedLabel = "In-Home Consultation Scheduled";
+      } else if (base.type === "consult" && base.status === "completed" && curIdx < stageOrder.indexOf("consultation")) {
+        suggestedStage = "consultation"; suggestedLabel = "In-Home Consultation Complete";
+      } else if (base.type === "a_la_carte" && base.status === "completed" && curIdx < stageOrder.indexOf("one_off")) {
+        suggestedStage = "one_off"; suggestedLabel = "One-Off Client";
+      }
+      if (suggestedStage && confirm(`Advance ${sp.firstName} ${sp.lastName}'s stage to "${suggestedLabel}"?`)) {
+        sp.stage = suggestedStage;
+        await dbUpdateProspect(sp);
+        const pi = state.prospects.findIndex(x => x.id === sp.id);
+        if (pi !== -1) state.prospects[pi] = sp;
+        if (state.currentProspectId === sp.id) document.getElementById("prospect-stage").value = suggestedStage;
+        renderProspectList();
+      }
+    }
+  }
 });
 
 document.getElementById("btn-complete-appointment").addEventListener("click", () => {

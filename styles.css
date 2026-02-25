@@ -732,6 +732,25 @@ textarea::placeholder {
 .followup-section__header--tomorrow { background: #fef9c3; color: #854d0e; }
 .followup-section__header--week     { background: #dcfce7; color: #166534; }
 
+/* ── Contact warning ────────────────────────────────────── */
+.contact-warning {
+  background: #fef9c3;
+  border: 1px solid #fbbf24;
+  border-radius: 8px;
+  padding: 0.45rem 0.85rem;
+  color: #92400e;
+  font-size: 0.85rem;
+  margin: 0.25rem 0 0.75rem;
+}
+.badge--warn {
+  background: #fef3c7;
+  color: #92400e;
+  border-radius: 999px;
+  padding: 0.12rem 0.5rem;
+  font-size: 0.73rem;
+  font-weight: 600;
+}
+
 /*  Pipeline stage badges  */
 .badge--new       { background: #e3e8f0; color: #3a4a6b; }
 .badge--contacted { background: #dbeafe; color: #1d4ed8; }
