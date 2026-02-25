@@ -1151,6 +1151,7 @@ document.getElementById("prospect-source-filter").addEventListener("change", () 
 // ── Render Prospect List ───────────────────────────────────
 const STAGE_LABELS = {
   new: "New Lead", contacted: "Contacted", "follow-up": "Follow-up",
+  consult_scheduled: "In-Home Consultation Scheduled",
   consultation: "In-Home Consultation Complete",
   proposal: "Proposed Schedule Sent", one_off: "One-Off Client", won: "Won", lost: "Lost",
 };

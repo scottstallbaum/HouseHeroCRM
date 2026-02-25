@@ -736,6 +736,7 @@ textarea::placeholder {
 .badge--new       { background: #e3e8f0; color: #3a4a6b; }
 .badge--contacted { background: #dbeafe; color: #1d4ed8; }
 .badge--follow-up { background: #fef3c7; color: #92400e; }
+.badge--consult_scheduled { background: #cffafe; color: #155e75; }
 .badge--consultation { background: #fce7f3; color: #9d174d; }
 .badge--proposal  { background: #ede9fe; color: #6d28d9; }
 .badge--one_off   { background: #ffedd5; color: #9a3412; }
