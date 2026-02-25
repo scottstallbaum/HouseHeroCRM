@@ -2610,7 +2610,7 @@ function appointmentCardHtml(a, opts = {}) {
       </div>
       <div style="display:flex;align-items:center;gap:0.5rem;flex-shrink:0;">
         <span class="customer-card__badge badge--${statusClass}">${a.status || "scheduled"}</span>
-        ${a.status !== "completed" && a.status !== "cancelled" ? `<button class="ghost appt-complete-btn" data-appt-id="${a.id}" type="button"><span style="font-size:1.1em;vertical-align:middle;">📝✔️</span> Mark as Complete</button>` : ""}
+        ${a.status !== "completed" && a.status !== "cancelled" ? `<button class="ghost ghost--small appt-complete-btn" data-appt-id="${a.id}" type="button"><span style="font-size:1.1em;vertical-align:middle;">📝✔️</span> Mark as Complete</button>` : ""}
         <button class="ghost ghost--small appt-edit-btn" data-appt-id="${a.id}" type="button">Edit</button>
         <button class="ghost danger icon-btn appt-delete-btn" data-appt-id="${a.id}" type="button">\u2715</button>
       </div>
