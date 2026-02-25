@@ -836,8 +836,14 @@ document.getElementById("form-customer").addEventListener("submit", async e => {
   }
 
   if (data.street && data.city && data.state && data.zip) {
-    const addrValid = await validateAddressWithCensus(data.street, data.city, data.state, data.zip);
-    if (addrValid === false && !confirm(`Address not verified: "${data.street}, ${data.city}, ${data.state} ${data.zip}"\n\nCheck for typos. Save anyway?`)) return;
+    const addrResult = await validateAddressWithCensus(data.street, data.city, data.state, data.zip);
+    if (addrResult !== null) {
+      if (!addrResult.ok && !confirm(`Address not verified: "${data.street}, ${data.city}, ${data.state} ${data.zip}"\n\nCheck for typos. Save anyway?`)) return;
+      if (addrResult.ok && addrResult.matchedZip && addrResult.matchedZip !== data.zip.replace(/\D/g, "").slice(0, 5) && !confirm(`Zip code may be wrong. Census matched zip: ${addrResult.matchedZip} (you entered: ${data.zip}).\n\nSave anyway?`)) return;
+    }
+  }
+  if (data.phone && data.phone.replace(/\D/g, "").length < 10) {
+    alert("Phone number must have at least 10 digits."); return;
   }
 
   if (state.editingCustomerId) {
@@ -1142,7 +1148,10 @@ async function validateAddressWithCensus(street, city, stateAbbr, zip) {
     const res = await fetch(`https://geocoding.geo.census.gov/geocoder/locations/address?${params}`, { signal: controller.signal });
     clearTimeout(timeoutId);
     const payload = await res.json();
-    return (payload?.result?.addressMatches?.length ?? 0) > 0;
+    const matches = payload?.result?.addressMatches || [];
+    if (matches.length === 0) return { ok: false, matchedZip: null };
+    const matchedZip = matches[0]?.addressComponents?.zip || null;
+    return { ok: true, matchedZip };
   } catch {
     return null; // timeout or network error — allow save
   }
@@ -1605,8 +1614,14 @@ document.getElementById("form-prospect").addEventListener("submit", async e => {
   };
 
   if (data.street && data.city && data.state && data.zip) {
-    const addrValid = await validateAddressWithCensus(data.street, data.city, data.state, data.zip);
-    if (addrValid === false && !confirm(`Address not verified: "${data.street}, ${data.city}, ${data.state} ${data.zip}"\n\nCheck for typos. Save anyway?`)) return;
+    const addrResult = await validateAddressWithCensus(data.street, data.city, data.state, data.zip);
+    if (addrResult !== null) {
+      if (!addrResult.ok && !confirm(`Address not verified: "${data.street}, ${data.city}, ${data.state} ${data.zip}"\n\nCheck for typos. Save anyway?`)) return;
+      if (addrResult.ok && addrResult.matchedZip && addrResult.matchedZip !== data.zip.replace(/\D/g, "").slice(0, 5) && !confirm(`Zip code may be wrong. Census matched zip: ${addrResult.matchedZip} (you entered: ${data.zip}).\n\nSave anyway?`)) return;
+    }
+  }
+  if (data.phone && data.phone.replace(/\D/g, "").length < 10) {
+    alert("Phone number must have at least 10 digits."); return;
   }
 
   if (state.editingProspectId) {
