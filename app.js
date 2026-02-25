@@ -1794,11 +1794,26 @@ document.getElementById("btn-convert-prospect").addEventListener("click", async 
 
   // Re-link prospect appointments to the new customer
   const prospectAppts = state.appointments.filter(a => a.prospectId === p.id);
+  let migratedCount = 0;
+  let failedAppts = [];
   for (const a of prospectAppts) {
     const idx = state.appointments.findIndex(x => x.id === a.id);
     state.appointments[idx] = { ...a, customerId: newCustomer.id, prospectId: null };
-    await dbUpdateAppointment(state.appointments[idx]);
+    try {
+      await dbUpdateAppointment(state.appointments[idx]);
+      migratedCount++;
+    } catch (err) {
+      failedAppts.push(a);
+      console.error("Appointment migration failed:", err);
+    }
   }
+
+  // Show migration summary
+  let summaryMsg = `${migratedCount} appointment${migratedCount !== 1 ? "s" : ""} migrated to customer profile.`;
+  if (failedAppts.length > 0) {
+    summaryMsg += `\n${failedAppts.length} appointment${failedAppts.length !== 1 ? "s" : ""} failed to migrate.`;
+  }
+  alert(summaryMsg);
 
   // Mark prospect as won
   p.stage = "won";
