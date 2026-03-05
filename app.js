@@ -1929,37 +1929,6 @@ document.getElementById("btn-delete-prospect").addEventListener("click", async (
   renderProspectList();
 });
 
-// ── Convert Prospect to Customer ───────────────────────────
-document.getElementById("btn-convert-prospect").addEventListener("click", async () => {
-  const p = getProspect(state.currentProspectId);
-  if (!p) return;
-  if (!confirm(`Convert ${p.firstName} ${p.lastName} to an active customer?`)) return;
-
-  const newCustomer = await dbInsertCustomer({
-    firstName: p.firstName, lastName: p.lastName,
-    street: p.street || "", city: p.city || "", state: p.state || "", zip: p.zip || "",
-    email: p.email || "", phone: p.phone || "",
-    status: "active", notes: p.notes || [], contacts: [],
-    startDate: new Date().toISOString().slice(0, 10),
-    secondary: p.secondary || null,
-  });
-
-  if (newCustomer) {
-    state.customers.unshift(newCustomer);
-    await dbDeleteProspect(state.currentProspectId);
-    state.prospects = state.prospects.filter(x => x.id !== state.currentProspectId);
-  }
-
-  document.querySelectorAll(".sidebar__link[data-view]").forEach(l => l.classList.remove("sidebar__link--active"));
-  document.querySelector(".sidebar__link[data-view='customers']").classList.add("sidebar__link--active");
-  document.getElementById("view-prospect-detail").style.display = "none";
-  document.getElementById("view-prospects").style.display = "none";
-  viewCustomers.style.display = "block";
-  state.currentProspectId = null;
-  renderCustomerList();
-  alert(`${p.firstName} ${p.lastName} has been added as an active customer!`);
-});
-
 // ── Schedule Constants ─────────────────────────────────────
 const SCHEDULE_PERIODS = ["Jan - Feb", "Mar - Apr", "May - Jun", "Jul - Aug", "Sep - Oct", "Nov - Dec"];
 const SCHEDULE_CATEGORIES = [
