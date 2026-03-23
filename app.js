@@ -3235,6 +3235,69 @@ function refreshMaintenanceTaskList() {
     return;
   }
 
+  function renderTaskRows(tasksToRender, periodLabel) {
+    if (!tasksToRender || tasksToRender.length === 0) {
+      periodEl.textContent = periodLabel ? `(${periodLabel} — no tasks scheduled)` : "";
+      listEl.innerHTML = `<p class="work-order-empty">No tasks scheduled for this period.</p>`;
+      section.style.display = "";
+      return;
+    }
+
+    periodEl.textContent = periodLabel ? `(${periodLabel})` : "";
+    section.style.display = "";
+
+    listEl.innerHTML = tasksToRender.map(t => `
+    <div class="work-order-task" data-task-id="${t.id || ""}" data-task-name="${escapeHtml(t.name || "")}" data-task-minutes="${t.minutes || 0}">
+      <span class="work-order-task__name">${escapeHtml(t.name || "")}</span>
+      <span class="work-order-task__min">${t.minutes || 0}m</span>
+      <button type="button" class="ghost ghost--small appt-remove-task-btn" title="Remove Task" style="margin-left:0.5rem;">✕</button>
+    </div>`).join("");
+
+    listEl.querySelectorAll('.appt-remove-task-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const taskDiv = btn.closest('.work-order-task');
+        if (taskDiv) taskDiv.remove();
+      });
+    });
+  }
+
+  // When editing, prefer the appointment's own saved tasks so prior edits persist.
+  const editingAppt = state.editingAppointmentId
+    ? state.appointments.find(a => a.id === state.editingAppointmentId)
+    : null;
+  if (editingAppt && Array.isArray(editingAppt.scheduledTasks) && editingAppt.scheduledTasks.length > 0) {
+    const editPeriod = getPeriodFromDate(editingAppt.date || dateStr);
+    renderTaskRows(editingAppt.scheduledTasks, editPeriod);
+
+    // Populate task library picker
+    const picker = document.getElementById('appt-task-library-picker');
+    if (picker) {
+      const allTasks = (state.globalTasks || []).map(t => `<option value="${t.id}">${escapeHtml(t.name)} (${t.minutes}m)</option>`).join("");
+      picker.innerHTML = `<option value="">-- Select task --</option>` + allTasks;
+    }
+
+    // Add task from library handler
+    const addBtn = document.getElementById('btn-add-task-to-appt');
+    if (addBtn && picker) {
+      addBtn.onclick = () => {
+        const taskId = picker.value;
+        if (!taskId) return;
+        const task = (state.globalTasks || []).find(t => t.id === taskId);
+        if (!task) return;
+        if ([...listEl.querySelectorAll('.work-order-task')].some(el => el.dataset.taskId === taskId)) return;
+        const div = document.createElement('div');
+        div.className = 'work-order-task';
+        div.dataset.taskId = task.id;
+        div.dataset.taskName = task.name;
+        div.dataset.taskMinutes = task.minutes;
+        div.innerHTML = `<span class="work-order-task__name">${escapeHtml(task.name)}</span><span class="work-order-task__min">${task.minutes}m</span><button type="button" class="ghost ghost--small appt-remove-task-btn" title="Remove Task" style="margin-left:0.5rem;">✕</button>`;
+        div.querySelector('.appt-remove-task-btn').onclick = () => div.remove();
+        listEl.appendChild(div);
+      };
+    }
+    return;
+  }
+
   const period = getPeriodFromDate(dateStr);
   const sched = state.schedules[customerId];
 
@@ -3251,30 +3314,7 @@ function refreshMaintenanceTaskList() {
   const scheduledIds = period && sched.schedule[period] ? sched.schedule[period] : [];
   const tasks = scheduledIds.map(id => sched.tasks.find(t => t.id === id)).filter(Boolean);
 
-  if (tasks.length === 0) {
-    periodEl.textContent = period ? `(${period} — no tasks scheduled)` : "";
-    listEl.innerHTML = `<p class="work-order-empty">No tasks scheduled for this period.</p>`;
-    section.style.display = "";
-    return;
-  }
-
-  periodEl.textContent = period ? `(${period})` : "";
-  section.style.display = "";
-
-  listEl.innerHTML = tasks.map(t => `
-    <div class="work-order-task" data-task-id="${t.id}" data-task-name="${escapeHtml(t.name)}" data-task-minutes="${t.minutes || 0}">
-      <span class="work-order-task__name">${escapeHtml(t.name)}</span>
-      <span class="work-order-task__min">${t.minutes || 0}m</span>
-      <button type="button" class="ghost ghost--small appt-remove-task-btn" title="Remove Task" style="margin-left:0.5rem;">✕</button>
-    </div>`).join("");
-
-  // Add remove handler
-  listEl.querySelectorAll('.appt-remove-task-btn').forEach(btn => {
-    btn.addEventListener('click', e => {
-      const taskDiv = btn.closest('.work-order-task');
-      if (taskDiv) taskDiv.remove();
-    });
-  });
+  renderTaskRows(tasks, period);
 
   // Populate task library picker
   const picker = document.getElementById('appt-task-library-picker');
@@ -3469,19 +3509,26 @@ document.getElementById("form-appointment").addEventListener("submit", async e =
     additionalWork: document.getElementById("appt-additional-task")?.value?.trim() || "",
     scheduledTasks: apptType === "maintenance"
       ? (() => {
-          // Preserve existing completion data if editing a completed appt
-          if (state.editingAppointmentId) {
-            const existing = state.appointments.find(a => a.id === state.editingAppointmentId);
-            if (existing && existing.status === "completed" && existing.scheduledTasks && existing.scheduledTasks.length > 0) {
-              return existing.scheduledTasks;
-            }
-          }
-          return [...document.querySelectorAll("#appt-tasks-list .work-order-task")].map(el => ({
+          const uiTasks = [...document.querySelectorAll("#appt-tasks-list .work-order-task")].map(el => ({
             id: el.dataset.taskId,
             name: el.dataset.taskName,
             minutes: parseInt(el.dataset.taskMinutes, 10) || 0,
             completed: false,
           }));
+
+          // If editing a completed appt, preserve completion status for matching tasks
+          if (state.editingAppointmentId) {
+            const existing = state.appointments.find(a => a.id === state.editingAppointmentId);
+            if (existing && existing.status === "completed" && existing.scheduledTasks && existing.scheduledTasks.length > 0) {
+              return uiTasks.map(task => {
+                const prior = existing.scheduledTasks.find(t =>
+                  (t.id && task.id && t.id === task.id) || (!t.id || !task.id) && t.name === task.name
+                );
+                return { ...task, completed: !!prior?.completed };
+              });
+            }
+          }
+          return uiTasks;
         })()
       : [],
     title: "", recurrence, recurrenceEndDate,
