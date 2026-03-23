@@ -287,7 +287,17 @@ async function dbInsertGlobalTask(task) {
 
 async function dbUpdateGlobalTask(task) {
   const { error } = await sb.from("global_tasks").update({
-    name: task.name, minutes: task.minutes, category: task.category, frequency: task.frequency
+    name: task.name,
+    minutes: task.minutes,
+    category: task.category,
+    frequency: task.frequency,
+    task_type: task.task_type || null,
+    rationale: task.rationale || null,
+    outcome: task.outcome || null,
+    tools: task.tools || [],
+    scope: task.scope || null,
+    homeowner_requirements: task.homeowner_requirements || [],
+    cost_items: task.cost_items || [],
   }).eq("id", task.id);
   if (error) console.error("Update global task error:", error);
 }
@@ -2345,6 +2355,7 @@ function renderGlobalTaskLibraryView() {
             <option value="annual" ${task.frequency === "annual" ? "selected" : ""}>Annual</option>
             <option value="adhoc" ${task.frequency === "adhoc" ? "selected" : ""}>Ad hoc</option>
           </select>
+          <button type="button" class="ghost ghost--small" data-glib-detail="${task.id}">Details</button>
           <button type="button" class="ghost danger icon-btn" data-glib-remove="${task.id}">&#10005;</button>
         </div>`).join("")}
     </div>`;
@@ -2370,7 +2381,137 @@ function renderGlobalTaskLibraryView() {
       renderGlobalTaskLibraryView();
     });
   });
+
+  container.querySelectorAll("[data-glib-detail]").forEach(btn => {
+    btn.addEventListener("click", () => openGlobalTaskDetailModal(btn.dataset.glibDetail));
+  });
 }
+
+// ── Task Detail Modal ───────────────────────────────────────────
+function openGlobalTaskDetailModal(taskId) {
+  const task = state.globalTasks.find(t => t.id === taskId);
+  if (!task) return;
+
+  document.getElementById("td-editing-id").value = taskId;
+  document.getElementById("td-name").value = task.name || "";
+  document.getElementById("td-minutes").value = task.minutes || 15;
+  document.getElementById("td-category").value = task.category || "";
+  document.getElementById("td-frequency").value = task.frequency || "every";
+  document.getElementById("td-task-type").value = task.task_type || "";
+  document.getElementById("td-rationale").value = task.rationale || "";
+  document.getElementById("td-outcome").value = task.outcome || "";
+  document.getElementById("td-scope").value = task.scope || "";
+
+  const toolsList = document.getElementById("td-tools-list");
+  toolsList.innerHTML = "";
+  (task.tools || []).forEach(t => addTdToolRow(t));
+  updateTdAddBtnState("td-tools-list", "btn-td-add-tool", 5);
+
+  const reqsList = document.getElementById("td-requirements-list");
+  reqsList.innerHTML = "";
+  (task.homeowner_requirements || []).forEach(r => addTdReqRow(r));
+  updateTdAddBtnState("td-requirements-list", "btn-td-add-req", 5);
+
+  const costList = document.getElementById("td-costs-list");
+  costList.innerHTML = "";
+  (task.cost_items || []).forEach(c => addTdCostRow(c.description || "", c.amount || ""));
+
+  openModal("modal-task-detail");
+}
+
+function addTdToolRow(value = "") {
+  const list = document.getElementById("td-tools-list");
+  const row = document.createElement("div");
+  row.className = "td-dynamic-row";
+  row.innerHTML = `<input type="text" class="td-tool-input" value="${escapeHtml(value)}" placeholder="e.g. Multimeter" /><button type="button" class="ghost ghost--small td-row-del" title="Remove">&times;</button>`;
+  row.querySelector(".td-row-del").addEventListener("click", () => {
+    row.remove();
+    updateTdAddBtnState("td-tools-list", "btn-td-add-tool", 5);
+  });
+  list.appendChild(row);
+  updateTdAddBtnState("td-tools-list", "btn-td-add-tool", 5);
+}
+
+function addTdReqRow(value = "") {
+  const list = document.getElementById("td-requirements-list");
+  const row = document.createElement("div");
+  row.className = "td-dynamic-row";
+  row.innerHTML = `<input type="text" class="td-req-input" value="${escapeHtml(value)}" placeholder="e.g. Clear access to water heater" /><button type="button" class="ghost ghost--small td-row-del" title="Remove">&times;</button>`;
+  row.querySelector(".td-row-del").addEventListener("click", () => {
+    row.remove();
+    updateTdAddBtnState("td-requirements-list", "btn-td-add-req", 5);
+  });
+  list.appendChild(row);
+  updateTdAddBtnState("td-requirements-list", "btn-td-add-req", 5);
+}
+
+function addTdCostRow(description = "", amount = "") {
+  const list = document.getElementById("td-costs-list");
+  const row = document.createElement("div");
+  row.className = "td-dynamic-row td-cost-row";
+  row.innerHTML = `<input type="text" class="td-cost-desc" value="${escapeHtml(description)}" placeholder="Description" /><input type="text" class="td-cost-amount" value="${escapeHtml(amount)}" placeholder="~$" style="width:90px;flex:0 0 90px;" /><button type="button" class="ghost ghost--small td-row-del" title="Remove">&times;</button>`;
+  row.querySelector(".td-row-del").addEventListener("click", () => row.remove());
+  list.appendChild(row);
+}
+
+function updateTdAddBtnState(listId, btnId, max) {
+  const count = document.getElementById(listId).children.length;
+  const btn = document.getElementById(btnId);
+  if (btn) btn.disabled = count >= max;
+}
+
+document.getElementById("btn-td-add-tool").addEventListener("click", () => addTdToolRow());
+document.getElementById("btn-td-add-req").addEventListener("click", () => addTdReqRow());
+document.getElementById("btn-td-add-cost").addEventListener("click", () => addTdCostRow());
+
+document.getElementById("form-task-detail").addEventListener("submit", async e => {
+  e.preventDefault();
+  const taskId = document.getElementById("td-editing-id").value;
+  const idx = state.globalTasks.findIndex(t => t.id === taskId);
+  if (idx === -1) return;
+
+  const tools = [...document.querySelectorAll("#td-tools-list .td-tool-input")]
+    .map(el => el.value.trim()).filter(Boolean);
+  const homeowner_requirements = [...document.querySelectorAll("#td-requirements-list .td-req-input")]
+    .map(el => el.value.trim()).filter(Boolean);
+  const cost_items = [...document.querySelectorAll("#td-costs-list .td-dynamic-row")].map(row => ({
+    description: row.querySelector(".td-cost-desc")?.value.trim() || "",
+    amount: row.querySelector(".td-cost-amount")?.value.trim() || "",
+  })).filter(c => c.description || c.amount);
+
+  const updated = {
+    ...state.globalTasks[idx],
+    name: document.getElementById("td-name").value.trim(),
+    minutes: Number(document.getElementById("td-minutes").value) || state.globalTasks[idx].minutes,
+    category: document.getElementById("td-category").value,
+    frequency: document.getElementById("td-frequency").value,
+    task_type: document.getElementById("td-task-type").value || null,
+    rationale: document.getElementById("td-rationale").value.trim() || null,
+    outcome: document.getElementById("td-outcome").value.trim() || null,
+    scope: document.getElementById("td-scope").value.trim() || null,
+    tools,
+    homeowner_requirements,
+    cost_items,
+  };
+
+  const submitBtn = e.target.querySelector("[type=submit]");
+  submitBtn.disabled = true;
+  await dbUpdateGlobalTask(updated);
+  state.globalTasks[idx] = updated;
+  submitBtn.disabled = false;
+
+  closeModal("modal-task-detail");
+  renderGlobalTaskLibraryView();
+});
+
+document.getElementById("btn-td-delete").addEventListener("click", async () => {
+  const taskId = document.getElementById("td-editing-id").value;
+  if (!taskId || !confirm("Delete this task from the global library?")) return;
+  await dbDeleteGlobalTask(taskId);
+  state.globalTasks = state.globalTasks.filter(t => t.id !== taskId);
+  closeModal("modal-task-detail");
+  renderGlobalTaskLibraryView();
+});
 
 document.getElementById("form-global-task").addEventListener("submit", async e => {
   e.preventDefault();
@@ -2379,6 +2520,7 @@ document.getElementById("form-global-task").addEventListener("submit", async e =
     minutes: Number(document.getElementById("gtask-minutes").value) || 15,
     category: document.getElementById("gtask-category").value,
     frequency: document.getElementById("gtask-frequency").value,
+    task_type: document.getElementById("gtask-task-type").value || null,
   };
   const saved = await dbInsertGlobalTask(task);
   if (saved) {

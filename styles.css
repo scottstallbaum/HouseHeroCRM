@@ -1146,7 +1146,7 @@ textarea::placeholder {
 
 .task-lib-row {
   display: grid;
-  grid-template-columns: 1fr 60px auto 130px auto;
+  grid-template-columns: 1fr 60px auto 130px auto auto;
   gap: 0.5rem;
   align-items: center;
   padding: 0.3rem 0;
@@ -1156,6 +1156,36 @@ textarea::placeholder {
   font-size: 0.75rem;
   color: var(--muted);
   margin-left: -0.25rem;
+}
+
+/* ── Task Detail Modal ────────────────────────────────────── */
+.td-section {
+  margin-bottom: 1.25rem;
+}
+
+.td-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.td-dynamic-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+}
+
+.td-dynamic-row input {
+  flex: 1;
+}
+
+.td-cost-row .td-cost-desc {
+  flex: 1;
 }
 
 /* ── Master Schedule View ─────────────────────────────────── */

@@ -367,6 +367,15 @@
               <option value="adhoc">Ad hoc</option>
             </select>
           </label>
+          <label style="flex:0 0 160px;">
+            Task Type
+            <select id="gtask-task-type">
+              <option value="">-- Select --</option>
+              <option value="maintenance">Maintenance</option>
+              <option value="testing_inspection">Testing / Inspection</option>
+              <option value="small_project">Small Project</option>
+            </select>
+          </label>
           <div style="display:flex;align-items:flex-end;padding-bottom:2px;">
             <button type="submit">+ Add Task</button>
           </div>
@@ -1051,6 +1060,97 @@
         <div class="modal__actions">
           <button type="submit">Save &amp; Complete</button>
           <button type="button" class="ghost" data-close="modal-complete-appt">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Task Detail / Edit -->
+  <div id="modal-task-detail" class="modal" style="display:none;">
+    <div class="modal__box" style="max-width:680px;">
+      <div class="modal__header">
+        <h2>Task Details</h2>
+        <button class="modal__close" data-close="modal-task-detail" type="button">✕</button>
+      </div>
+      <form id="form-task-detail">
+        <input type="hidden" id="td-editing-id" />
+        <div class="form-grid">
+          <label>
+            Task Name *
+            <input type="text" id="td-name" required />
+          </label>
+          <label>
+            Duration (minutes) *
+            <input type="number" id="td-minutes" min="1" max="180" required />
+          </label>
+          <label>
+            Category
+            <select id="td-category">
+              <option value="Appliance Maintenance">Appliance Maintenance</option>
+              <option value="Auto Maintenance">Auto Maintenance</option>
+              <option value="Energy Efficiency">Energy Efficiency</option>
+              <option value="Home Safety">Home Safety</option>
+              <option value="HVAC">HVAC</option>
+              <option value="Seasonal">Seasonal</option>
+              <option value="Plumbing">Plumbing</option>
+            </select>
+          </label>
+          <label>
+            Frequency
+            <select id="td-frequency">
+              <option value="every">Every visit</option>
+              <option value="annual">Annual</option>
+              <option value="adhoc">Ad hoc</option>
+            </select>
+          </label>
+          <label>
+            Task Type
+            <select id="td-task-type">
+              <option value="">-- Select --</option>
+              <option value="maintenance">Maintenance</option>
+              <option value="testing_inspection">Testing / Inspection</option>
+              <option value="small_project">Small Project</option>
+            </select>
+          </label>
+          <div class="span-2"></div>
+          <label class="span-2">
+            Rationale
+            <textarea id="td-rationale" rows="2" placeholder="Why is this task important?"></textarea>
+          </label>
+          <label class="span-2">
+            Outcome
+            <textarea id="td-outcome" rows="2" placeholder="What is the expected result of completing this task?"></textarea>
+          </label>
+          <label class="span-2">
+            Scope
+            <textarea id="td-scope" rows="2" placeholder="What does this task include / exclude?"></textarea>
+          </label>
+        </div>
+        <div class="td-section">
+          <div class="td-section-header">
+            <span>Required Tools / Equipment <small style="font-weight:400;color:var(--muted);">(up to 5)</small></span>
+            <button type="button" id="btn-td-add-tool" class="ghost ghost--small">+ Add</button>
+          </div>
+          <div id="td-tools-list"></div>
+        </div>
+        <div class="td-section">
+          <div class="td-section-header">
+            <span>Requirements for Homeowner <small style="font-weight:400;color:var(--muted);">(up to 5)</small></span>
+            <button type="button" id="btn-td-add-req" class="ghost ghost--small">+ Add</button>
+          </div>
+          <div id="td-requirements-list"></div>
+        </div>
+        <div class="td-section">
+          <div class="td-section-header">
+            <span>Additional Cost Items</span>
+            <button type="button" id="btn-td-add-cost" class="ghost ghost--small">+ Add</button>
+          </div>
+          <div id="td-costs-list"></div>
+        </div>
+        <div class="modal__actions">
+          <button type="submit">Save Changes</button>
+          <button type="button" id="btn-td-delete" class="ghost danger">Delete Task</button>
+          <button type="button" class="ghost" data-close="modal-task-detail">Cancel</button>
         </div>
       </form>
     </div>
